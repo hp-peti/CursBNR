@@ -10,7 +10,7 @@ from curstypes import to_date
 
 db = CursDB("bnr.db")
 
-start_date = "2016-01-01"
+start_date = "2014-01-01"
 commit_every_n = 1024
 exclude_currency_before = {"THB": to_date("2017-06-19")}
 
