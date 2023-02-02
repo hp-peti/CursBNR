@@ -1,37 +1,38 @@
 from xml.sax.handler import ContentHandler
 from xml.sax import parse as xml_parse
+from xml.sax.saxutils import escape
+from curstypes import CursMap
 
 import datetime as dt
 
-def _str2num(x: str) -> int | float:
-    f = float(x)
-    i = int(f)
-    return f if i != f else i
+
+def escape_attr(data):
+    entities = {
+        "\n": "&#10;",
+        "\r": "&#13;",
+        "\t": "&#9;",
+        "'": "&apos;",
+        '"': "&quot;",
+    }
+    return escape(data, entities)
+
 
 class _BnrXmlHandler(ContentHandler):
-    def __init__(self) -> None:
+    def __init__(self, map: CursMap) -> None:
         super().__init__()
         self._stack = []
-        self._items = {}
+        self._map = CursMap()
         self._currency = None
 
     def startElement(self, name, attrs):
         stack = self._stack
         stack.append(name)
 
-        if len(stack) >= 2:
-            if stack[0] == "values" and stack[1] == "currency":
-                if len(stack) == 2:
-                    if "name" in attrs:
-                        self._currency = self._items.setdefault(attrs["name"], dict())
-                elif self._currency is not None:
-                    if stack[2] == "rate":
-                        if len(stack) == 3:
-                            if "date" in attrs and "value" in attrs:
-                                date = dt.date.fromisoformat(attrs["date"])
-                                value = _str2num(attrs["value"])
-                                self._currency[date] = value
+        if stack == ["values", "currency"]:
+            self._currency = attrs["name"]
 
+        elif stack == ["values", "currency", "rate"]:
+            self._map.put_value(attrs["date"], self._currency, attrs["value"])
 
     def endElement(self, name):
         stack = self._stack
@@ -42,9 +43,32 @@ class _BnrXmlHandler(ContentHandler):
 
     pass
 
-def parse_bnr_xml(file):
-    handler = _BnrXmlHandler()
-    xml_parse(file, handler)
-    return handler._items
+
+def parse_bnr_xml(file) -> CursMap:
+    map = CursMap()
+    xml_parse(file, _BnrXmlHandler(map))
+    return map
 
 
+def write_bnr_xml(map: CursMap, file):
+    with open(file, "w", encoding="utf-8", newline="\r\n") as f:
+        f.write("<?xml version='1.0' encoding='utf-8'?>\n")
+        f.write("<values>\n")
+        try:
+            for currency in sorted(map.keys()):
+                f.write(f"\t<currency name='{escape_attr(currency)}'>\n")
+                try:
+                    for date, value in sorted(map[currency].items()):
+                        assert isinstance(date, dt.date)
+                        value = (
+                            "{:.6g}".format(value)
+                            if isinstance(value, float)
+                            else str(int(value))
+                        )
+                        f.write(
+                            f"\t\t<rate date='{escape_attr(date.isoformat())}' value='{escape_attr(value)}' />\n"
+                        )
+                finally:
+                    f.write(f"\t</currency>\n")
+        finally:
+            f.write("</values>")

@@ -3,16 +3,8 @@ from suds.client import Client as _suds_Client
 
 import datetime as dt
 
-_Date = str | dt.date | dt.datetime
+from curstypes import _DateT, to_datetime
 
-def date2dt(date: _Date) -> dt.datetime:
-    if isinstance(date, str):
-        return dt.datetime.fromisoformat(date)
-    elif isinstance(date, dt.date):
-        return dt.datetime.combine(date, dt.time())
-    else:
-        assert isinstance(date, dt.datetime)
-        return date
 
 class CursClient:
     def __init__(self):
@@ -22,10 +14,12 @@ class CursClient:
     def lastdate(self) -> dt.date:
         return self._client.service.lastdateinserted().date()
 
-    def getall(self, date: _Date | None = None) -> List[Tuple[dt.date, str, int | float]]:
+    def getall(
+        self, date: _DateT | None = None
+    ) -> List[Tuple[dt.date, str, int | float]]:
         if date is None:
             date = self.lastdate
-        date = date2dt(date)
+        date = to_datetime(date)
 
         level0 = self._client.service.getall(date).diffgram
         level1 = level0[0] if level0 else []
@@ -39,8 +33,9 @@ class CursClient:
             return f if i != f else i
 
         return [
-            (date.date(), str(currency.IDMoneda[0]), number(currency.Value[0])) for currency in currencies
+            (date.date(), str(currency.IDMoneda[0]), number(currency.Value[0]))
+            for currency in currencies
         ]
 
-    def getvalue(self, date: _Date, currency: str) -> int | float | None:
+    def getvalue(self, date: _DateT, currency: str) -> int | float | None:
         return self._client.service.getvalue(date, currency)
