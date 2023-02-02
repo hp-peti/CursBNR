@@ -1,9 +1,10 @@
 import sqlite3
 from datetime import datetime, date as _date, time as _time
-from typing import Sequence
+from typing import List, Sequence
 import datetime as dt
 
 from curstypes import _DateT, to_date
+
 
 class CursDB:
     def __init__(self, dbname: str):
@@ -12,13 +13,17 @@ class CursDB:
         )
 
         db = self._db
-        has_table = db.execute(
-            """
-            SELECT COUNT(*) FROM sqlite_schema WHERE name == 'CURSBNR'
-        """
-        ).fetchall()[0][0]
+        cursor = db.execute(
+            "SELECT COUNT(*) FROM sqlite_schema WHERE name == ?",
+            ("CURSBNR",),
+        )
+        try:
+            has_table = cursor.fetchone()[0]
+        finally:
+            cursor.close()
+
         if not has_table:
-            cursor = db.execute(
+            db.execute(
                 """
                 CREATE TABLE CURSBNR(
                     date DATE NOT NULL,
@@ -27,8 +32,7 @@ class CursDB:
                     PRIMARY KEY (date, currency)
                 ) WITHOUT ROWID
                 """
-            )
-            cursor.close()
+            ).close()
 
     def put_value(
         self,
@@ -51,12 +55,12 @@ class CursDB:
         assert isinstance(currency, str)
         assert isinstance(value, (int, float))
         _or_action = {None: "", True: "OR REPLACE", False: "OR IGNORE"}[replace]
-        cursor = self._db.execute(
-            "INSERT " + _or_action + " INTO CURSBNR (date, currency, value) VALUES (?, ?, ?)",
+        self._db.execute(
+            "INSERT "
+            + _or_action
+            + " INTO CURSBNR (date, currency, value) VALUES (?, ?, ?)",
             (date, currency, value),
-        )
-        cursor.fetchone()
-        cursor.close()
+        ).close()
 
     def commit(self):
         self._db.commit()
@@ -71,20 +75,28 @@ class CursDB:
             "SELECT value FROM CURSBNR WHERE date=? AND CURRENCY=?",
             [date, currency],
         )
-        result = cursor.fetchone()
-        cursor.close()
+        try:
+            result = cursor.fetchone()
+        finally:
+            cursor.close()
+
         if result is not None:
             return result[0]
 
     def remove_value(self, date: _DateT, currency: str):
         date = to_date(date)
         assert isinstance(currency, str)
-        cursor = self._db.execute(
+        self._db.execute(
             "DELETE FROM CURSBNR WHERE date=? AND CURRENCY=?",
             [date.date(), currency],
-        )
-        result = cursor.fetchone()
-        cursor.close()
+        ).close()
+
+    def get_currencies(self) -> List[str]:
+        cursor = self._db.execute("SELECT currency FROM CURSBNR GROUP BY currency")
+        try:
+            return [currency for currency, in cursor.fetchall()]
+        finally:
+            cursor.close()
 
     def select_rows(
         self,
@@ -92,7 +104,7 @@ class CursDB:
         date: _DateT | tuple[_DateT, _DateT] | None = None,
         currency: str | list[str] | None = None,
         orderby: str | None = None,
-    ) -> Sequence[tuple[datetime, str, int | float]]:
+    ) -> List[tuple[datetime, str, int | float]]:
         sql = "SELECT date, currency, value FROM CURSBNR"
         params = []
         sep = "\nWHERE "
@@ -112,7 +124,7 @@ class CursDB:
                 sep = _AND_
 
             if d2 is not None:
-                sql += sep + "dat <= ?"
+                sql += sep + "date <= ?"
                 params.append(to_date(d2))
                 sep = _AND_
 
@@ -154,12 +166,10 @@ class CursDB:
         if orderby:
             sql += " ORDER BY\n    " + ",".join(orderby)
 
-        #print(sql)
+        # print(sql)
         cursor = self._db.execute(sql, params)
         try:
-            while (row := cursor.fetchone()) is not None:
-                date, currency, value = row
-                yield date, currency, value
+            return cursor.fetchall()
         finally:
             cursor.close()
 

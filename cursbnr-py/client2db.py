@@ -52,7 +52,7 @@ try:
                     if autoexclude:
                         if re.fullmatch(r".*Object reference not set to an instance of an object\..*", str(wf)):
                             tqdm.write(f"Skipping {currency} before {date.date()}")
-                            exclude_currency.add(currency)
+                            exclude_currency.append(currency)
 
 
                 if value is not None:
