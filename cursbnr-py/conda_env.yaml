@@ -1,0 +1,24 @@
+# Usage:
+#     conda env create --file conda_env.yaml
+#     conda env update --file conda_env.yaml
+#     conda env remove -n cursbnr-py
+name: cursbnr-py
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.10
+  - ipython
+  - numpy
+  - python-dateutil
+  #- pandas>=1.5
+  - matplotlib
+  #- xarray
+  #- tk
+  - jupyter
+  #- pyqt # <- can't be built on Raspberry Pi
+  #- ipywidgets<8.0 # VS Code doesn't properly support 8.0
+  #- ipympl
+  - suds
+  # - pip
+  #- pip:
+    # --

@@ -1,0 +1,368 @@
+<?xml version="1.0" encoding="utf-8"?>
+<wsdl:definitions xmlns:s="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://schemas.xmlsoap.org/wsdl/soap12/" xmlns:http="http://schemas.xmlsoap.org/wsdl/http/" xmlns:mime="http://schemas.xmlsoap.org/wsdl/mime/" xmlns:tns="http://www.infovalutar.ro/" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:tm="http://microsoft.com/wsdl/mime/textMatching/" xmlns:soapenc="http://schemas.xmlsoap.org/soap/encoding/" targetNamespace="http://www.infovalutar.ro/" xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">
+  <wsdl:types>
+    <s:schema elementFormDefault="qualified" targetNamespace="http://www.infovalutar.ro/">
+      <s:element name="GetLatestValue">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="Moneda" type="s:string" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="GetLatestValueResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="1" maxOccurs="1" name="GetLatestValueResult" type="s:double" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="getlatestvalue">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="Moneda" type="s:string" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="getlatestvalueResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="1" maxOccurs="1" name="getlatestvalueResult" type="s:double" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="getall">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="1" maxOccurs="1" name="dt" type="s:dateTime" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="getallResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="getallResult">
+              <s:complexType>
+                <s:sequence>
+                  <s:any minOccurs="0" maxOccurs="unbounded" namespace="http://www.w3.org/2001/XMLSchema" processContents="lax" />
+                  <s:any minOccurs="1" namespace="urn:schemas-microsoft-com:xml-diffgram-v1" processContents="lax" />
+                </s:sequence>
+              </s:complexType>
+            </s:element>
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="getvalue">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="1" maxOccurs="1" name="TheDate" type="s:dateTime" />
+            <s:element minOccurs="0" maxOccurs="1" name="Moneda" type="s:string" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="getvalueResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="1" maxOccurs="1" name="getvalueResult" type="s:double" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="getvalueadv">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="1" maxOccurs="1" name="thedate" type="s:dateTime" />
+            <s:element minOccurs="0" maxOccurs="1" name="themoneda" type="s:string" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="getvalueadvResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="0" maxOccurs="1" name="getvalueadvResult" type="tns:DateValue" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:complexType name="DateValue">
+        <s:sequence>
+          <s:element minOccurs="1" maxOccurs="1" name="date" type="s:dateTime" />
+          <s:element minOccurs="1" maxOccurs="1" name="value" type="s:double" />
+          <s:element minOccurs="0" maxOccurs="1" name="moneda" type="s:string" />
+        </s:sequence>
+      </s:complexType>
+      <s:element name="GetValue">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="1" maxOccurs="1" name="TheDate" type="s:dateTime" />
+            <s:element minOccurs="0" maxOccurs="1" name="Moneda" type="s:string" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="GetValueResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="1" maxOccurs="1" name="GetValueResult" type="s:double" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="LastDateInserted">
+        <s:complexType />
+      </s:element>
+      <s:element name="LastDateInsertedResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="1" maxOccurs="1" name="LastDateInsertedResult" type="s:dateTime" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+      <s:element name="lastdateinserted">
+        <s:complexType />
+      </s:element>
+      <s:element name="lastdateinsertedResponse">
+        <s:complexType>
+          <s:sequence>
+            <s:element minOccurs="1" maxOccurs="1" name="lastdateinsertedResult" type="s:dateTime" />
+          </s:sequence>
+        </s:complexType>
+      </s:element>
+    </s:schema>
+  </wsdl:types>
+  <wsdl:message name="GetLatestValueSoapIn">
+    <wsdl:part name="parameters" element="tns:GetLatestValue" />
+  </wsdl:message>
+  <wsdl:message name="GetLatestValueSoapOut">
+    <wsdl:part name="parameters" element="tns:GetLatestValueResponse" />
+  </wsdl:message>
+  <wsdl:message name="getlatestvalueSoapIn">
+    <wsdl:part name="parameters" element="tns:getlatestvalue" />
+  </wsdl:message>
+  <wsdl:message name="getlatestvalueSoapOut">
+    <wsdl:part name="parameters" element="tns:getlatestvalueResponse" />
+  </wsdl:message>
+  <wsdl:message name="getallSoapIn">
+    <wsdl:part name="parameters" element="tns:getall" />
+  </wsdl:message>
+  <wsdl:message name="getallSoapOut">
+    <wsdl:part name="parameters" element="tns:getallResponse" />
+  </wsdl:message>
+  <wsdl:message name="getvalueSoapIn">
+    <wsdl:part name="parameters" element="tns:getvalue" />
+  </wsdl:message>
+  <wsdl:message name="getvalueSoapOut">
+    <wsdl:part name="parameters" element="tns:getvalueResponse" />
+  </wsdl:message>
+  <wsdl:message name="getvalueadvSoapIn">
+    <wsdl:part name="parameters" element="tns:getvalueadv" />
+  </wsdl:message>
+  <wsdl:message name="getvalueadvSoapOut">
+    <wsdl:part name="parameters" element="tns:getvalueadvResponse" />
+  </wsdl:message>
+  <wsdl:message name="GetValueSoapIn">
+    <wsdl:part name="parameters" element="tns:GetValue" />
+  </wsdl:message>
+  <wsdl:message name="GetValueSoapOut">
+    <wsdl:part name="parameters" element="tns:GetValueResponse" />
+  </wsdl:message>
+  <wsdl:message name="LastDateInsertedSoapIn">
+    <wsdl:part name="parameters" element="tns:LastDateInserted" />
+  </wsdl:message>
+  <wsdl:message name="LastDateInsertedSoapOut">
+    <wsdl:part name="parameters" element="tns:LastDateInsertedResponse" />
+  </wsdl:message>
+  <wsdl:message name="lastdateinsertedSoapIn">
+    <wsdl:part name="parameters" element="tns:lastdateinserted" />
+  </wsdl:message>
+  <wsdl:message name="lastdateinsertedSoapOut">
+    <wsdl:part name="parameters" element="tns:lastdateinsertedResponse" />
+  </wsdl:message>
+  <wsdl:portType name="CursSoap">
+    <wsdl:operation name="GetLatestValue">
+      <wsdl:input message="tns:GetLatestValueSoapIn" />
+      <wsdl:output message="tns:GetLatestValueSoapOut" />
+    </wsdl:operation>
+    <wsdl:operation name="getlatestvalue">
+      <wsdl:input message="tns:getlatestvalueSoapIn" />
+      <wsdl:output message="tns:getlatestvalueSoapOut" />
+    </wsdl:operation>
+    <wsdl:operation name="getall">
+      <wsdl:input message="tns:getallSoapIn" />
+      <wsdl:output message="tns:getallSoapOut" />
+    </wsdl:operation>
+    <wsdl:operation name="getvalue">
+      <wsdl:input message="tns:getvalueSoapIn" />
+      <wsdl:output message="tns:getvalueSoapOut" />
+    </wsdl:operation>
+    <wsdl:operation name="getvalueadv">
+      <wsdl:input message="tns:getvalueadvSoapIn" />
+      <wsdl:output message="tns:getvalueadvSoapOut" />
+    </wsdl:operation>
+    <wsdl:operation name="GetValue">
+      <wsdl:input message="tns:GetValueSoapIn" />
+      <wsdl:output message="tns:GetValueSoapOut" />
+    </wsdl:operation>
+    <wsdl:operation name="LastDateInserted">
+      <wsdl:input message="tns:LastDateInsertedSoapIn" />
+      <wsdl:output message="tns:LastDateInsertedSoapOut" />
+    </wsdl:operation>
+    <wsdl:operation name="lastdateinserted">
+      <wsdl:input message="tns:lastdateinsertedSoapIn" />
+      <wsdl:output message="tns:lastdateinsertedSoapOut" />
+    </wsdl:operation>
+  </wsdl:portType>
+  <wsdl:binding name="CursSoap" type="tns:CursSoap">
+    <soap:binding transport="http://schemas.xmlsoap.org/soap/http" />
+    <wsdl:operation name="GetLatestValue">
+      <soap:operation soapAction="http://www.infovalutar.ro/GetLatestValue" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="getlatestvalue">
+      <soap:operation soapAction="http://www.infovalutar.ro/getlatestvalue" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="getall">
+      <soap:operation soapAction="http://www.infovalutar.ro/getall" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="getvalue">
+      <soap:operation soapAction="http://www.infovalutar.ro/getvalue" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="getvalueadv">
+      <soap:operation soapAction="http://www.infovalutar.ro/getvalueadv" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="GetValue">
+      <soap:operation soapAction="http://www.infovalutar.ro/GetValue" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LastDateInserted">
+      <soap:operation soapAction="http://www.infovalutar.ro/LastDateInserted" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="lastdateinserted">
+      <soap:operation soapAction="http://www.infovalutar.ro/lastdateinserted" style="document" />
+      <wsdl:input>
+        <soap:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+  </wsdl:binding>
+  <wsdl:binding name="CursSoap12" type="tns:CursSoap">
+    <soap12:binding transport="http://schemas.xmlsoap.org/soap/http" />
+    <wsdl:operation name="GetLatestValue">
+      <soap12:operation soapAction="http://www.infovalutar.ro/GetLatestValue" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="getlatestvalue">
+      <soap12:operation soapAction="http://www.infovalutar.ro/getlatestvalue" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="getall">
+      <soap12:operation soapAction="http://www.infovalutar.ro/getall" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="getvalue">
+      <soap12:operation soapAction="http://www.infovalutar.ro/getvalue" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="getvalueadv">
+      <soap12:operation soapAction="http://www.infovalutar.ro/getvalueadv" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="GetValue">
+      <soap12:operation soapAction="http://www.infovalutar.ro/GetValue" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="LastDateInserted">
+      <soap12:operation soapAction="http://www.infovalutar.ro/LastDateInserted" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+    <wsdl:operation name="lastdateinserted">
+      <soap12:operation soapAction="http://www.infovalutar.ro/lastdateinserted" style="document" />
+      <wsdl:input>
+        <soap12:body use="literal" />
+      </wsdl:input>
+      <wsdl:output>
+        <soap12:body use="literal" />
+      </wsdl:output>
+    </wsdl:operation>
+  </wsdl:binding>
+  <wsdl:service name="Curs">
+    <wsdl:port name="CursSoap" binding="tns:CursSoap">
+      <soap:address location="http://www.infovalutar.ro/curs.asmx" />
+    </wsdl:port>
+    <wsdl:port name="CursSoap12" binding="tns:CursSoap12">
+      <soap12:address location="http://www.infovalutar.ro/curs.asmx" />
+    </wsdl:port>
+  </wsdl:service>
+</wsdl:definitions>

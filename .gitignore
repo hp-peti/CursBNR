@@ -3,3 +3,5 @@
 /Backup
 /bin
 /CursBNR/obj
+cursbnr-py/__pycache__/
+cursbnr-py/*.db
