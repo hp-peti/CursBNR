@@ -20,8 +20,9 @@ def escape_attr(data):
 class _BnrXmlHandler(ContentHandler):
     def __init__(self, map: CursMap) -> None:
         super().__init__()
+        assert isinstance(map, CursMap)
+        self._map = map
         self._stack = []
-        self._map = CursMap()
         self._currency = None
 
     def startElement(self, name, attrs):

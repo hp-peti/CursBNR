@@ -5,8 +5,10 @@ from tqdm import tqdm
 
 # %%
 from cursdb import CursDB
-db = CursDB("bnr.xml.db")
+db = CursDB("bnr.db")
 
+start_date = "2017-01-01"
+commit_every_n = 1024
 
 # %%
 from cursclient import CursClient
@@ -18,10 +20,10 @@ currencies = list(map(lambda x: x[1], client.getall()))
 print(*currencies, sep=", ")
 
 # %%
+days = list(rrule(DAILY, to_date(start_date), until=client.lastdate))
+days.reverse()
+loop = tqdm(days, leave=False)
 try:
-    days = list(rrule(DAILY, to_date("2010-01-01"), until=client.lastdate))
-    days.reverse()
-    loop = tqdm(days)
     inserted = 0
     for date in loop:
         for currency in currencies:
@@ -33,7 +35,8 @@ try:
                 if value is not None:
                     db.insert_value(date, currency, value, replace=False)
                     inserted += 1
-                    if inserted > 100:
+                    if inserted >= commit_every_n:
+                        loop.set_postfix_str("COMMITING...  ")
                         db.commit()
                         inserted = 0
 

@@ -55,6 +55,7 @@ class CursDB:
             "INSERT " + _or_action + " INTO CURSBNR (date, currency, value) VALUES (?, ?, ?)",
             (date, currency, value),
         )
+        cursor.fetchone()
         cursor.close()
 
     def commit(self):

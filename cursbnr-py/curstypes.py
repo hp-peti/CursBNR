@@ -39,8 +39,8 @@ class CursMap(dict):
         pass
 
     def put_value(self, date: _DateT, currency: str, value: _NumT):
-        submap = self.get(currency, None)
         assert isinstance(currency, str)
+        submap = self.get(currency, None)
         if submap is None:
             self[currency] = (submap := dict())
         submap[to_date(date)] = to_numeric(value)
