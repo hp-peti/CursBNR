@@ -13,7 +13,7 @@ map = parse_bnr_xml("bnr.xml")
 
 # %%
 
-for date, currency, value in map.value_items():
+for date, currency, value in map.rows():
     db.insert_value(date, currency, value, replace=False)
 
 db.commit()
