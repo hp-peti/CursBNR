@@ -5,3 +5,5 @@
 /CursBNR/obj
 cursbnr-py/__pycache__/
 cursbnr-py/*.db
+cursbnr-py/*.db-journal
+

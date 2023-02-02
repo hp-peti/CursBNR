@@ -7,18 +7,19 @@ channels:
   - conda-forge
 dependencies:
   - python>=3.10
+  - suds
+  - sqlite
   - ipython
   - numpy
   - python-dateutil
-  #- pandas>=1.5
+  - pandas>=1.5
   - matplotlib
-  #- xarray
-  #- tk
+  - xarray
+  - tk
   - jupyter
-  #- pyqt # <- can't be built on Raspberry Pi
-  #- ipywidgets<8.0 # VS Code doesn't properly support 8.0
-  #- ipympl
-  - suds
-  # - pip
+  - pyqt # <- can't be built on Raspberry Pi
+  - ipywidgets<8.0 # VS Code doesn't properly support 8.0
+  - ipympl
+  - tqdm
   #- pip:
     # --
