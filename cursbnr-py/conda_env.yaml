@@ -21,5 +21,7 @@ dependencies:
   - ipywidgets<8.0 # VS Code doesn't properly support 8.0
   - ipympl
   - tqdm
-  #- pip:
-    # --
+  #- rich
+  - pip
+  - pip:
+    - termtables
