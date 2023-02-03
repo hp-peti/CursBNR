@@ -11,9 +11,10 @@ from cursclient import CursClient
 from curstypes import CursMap, to_date
 
 
-start_date = "1990-01-01"
+start_date = "1998-01-01"
 commit_every_n = 1024
 before_first_valid_date = {
+    "THB": to_date("2017-06-18"),
     "AED": to_date("2009-03-01"),
     "BRL": to_date("2009-03-01"),
     "CNY": to_date("2009-03-01"),
@@ -30,12 +31,22 @@ before_first_valid_date = {
     "CZK": to_date('2001-11-11'),
     "HUF": to_date('2001-11-11'),
     "PLN": to_date('2001-11-11'),
-    # "---": to_date('2009-XX-XX'),
-    # "---": to_date('2009-XX-XX'),
-    # "---": to_date('2009-XX-XX'),
-    "THB": to_date("2017-06-18"),
+    "EUR": to_date('1999-01-13'),
+    "AUD": to_date('1998-01-04'),
+    "CAD": to_date('1998-01-04'),
+    "CHF": to_date('1998-01-04'),
+    "DKK": to_date('1998-01-04'),
+    "EGP": to_date('1998-01-04'),
+    "GBP": to_date('1998-01-04'),
+    "JPY": to_date('1998-01-04'),
+    "MDL": to_date('1998-01-04'),
+    "NOK": to_date('1998-01-04'),
+    "SEK": to_date('1998-01-04'),
+    "USD": to_date('1998-01-04'),
+    "XAU": to_date('1998-01-04'),
+    "XDR": to_date('1998-01-04'),
 }
-autoexclude = True
+autoexclude = False
 
 # %%
 
