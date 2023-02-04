@@ -1,5 +1,5 @@
 import datetime as dt
-from typing import Tuple, Sequence
+from typing import Iterable, List, Tuple
 
 _DateT = str | dt.date | dt.datetime
 _NumT = str | int | float
@@ -7,6 +7,7 @@ _NumT = str | int | float
 Date = dt.date
 Numeric = int | float
 DateTime = dt.datetime
+
 
 def to_date(date: _DateT) -> Date:
     if isinstance(date, str):
@@ -25,6 +26,7 @@ def to_numeric(x: _NumT) -> Numeric:
     i = int(f)
     return f if i != f else i
 
+
 def to_datetime(date: _DateT) -> DateTime:
     if isinstance(date, str):
         return dt.datetime.fromisoformat(date)
@@ -33,6 +35,20 @@ def to_datetime(date: _DateT) -> DateTime:
     else:
         assert isinstance(date, dt.datetime)
         return date
+
+
+def extract_dates_values(
+    rows: Iterable[Tuple[Date, str, Numeric]], /, *, currency: str
+) -> Tuple[List[Date], List[Numeric]]:
+
+    if currency is not None:
+        rows = filter(lambda dcv: dcv[1] == currency, rows)
+
+    rows = map(lambda dcv: (dcv[0], dcv[2]), rows)
+
+    dates, values = zip(*rows)
+    return list(dates), list(values)
+
 
 class CursMap(dict):
     def __init__(self):
@@ -51,7 +67,10 @@ class CursMap(dict):
         if submap is not None:
             return submap.get(currency, None)
 
-    def rows(self) -> Sequence[Tuple[str, Date, Numeric]]:
+    def rows(self) -> Iterable[Tuple[str, Date, Numeric]]:
         for currency, rates in self.items():
             for date, value in rates.items():
                 yield date, currency, value
+
+    def get_size(self):
+        return sum(len(submap) for submap in self.values())

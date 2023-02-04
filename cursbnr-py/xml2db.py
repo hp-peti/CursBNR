@@ -10,6 +10,7 @@ db = CursDB("bnr.db")
 # %%
 map = parse_bnr_xml("bnr.xml")
 
+print(f"Read {map.get_size()} items.")
 
 # %%
 

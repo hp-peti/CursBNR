@@ -157,12 +157,11 @@ class CursDB:
                 "date:asc": "date ASC",
             }[order]
 
-        if orderby is None:
-            orderby = []
-        elif isinstance(orderby, (tuple, list)):
+        if orderby is not None:
+            if isinstance(orderby, str):
+                orderby = orderby.split(",")
             orderby = list(map(map_order, orderby))
-        else:
-            orderby = [map_order(orderby)]
+
         if orderby:
             sql += " ORDER BY\n    " + ",".join(orderby)
 
