@@ -45,8 +45,13 @@ before_first_valid_date = {
     "USD": to_date("1998-01-04"),
     "XAU": to_date("1998-01-04"),
     "XDR": to_date("1998-01-04"),
-    "HRK": None
+    "HRK": to_date("2015-08-20")
 }
+
+last_valid_date = {
+    "HRK": to_date("2022-12-31"),
+}
+
 autoexclude = True
 
 # %%
@@ -56,11 +61,6 @@ client = CursClient()
 
 # %%
 currencies = list(map(lambda x: x[1], client.getall()))
-for currency in before_first_valid_date.keys():
-    if currency not in currencies:
-        currencies.append(currency)
-
-print(*currencies, sep=", ")
 
 xcache = set()
 for date, currency, _ in db.select_rows(currency=currencies):
@@ -72,22 +72,27 @@ days = list(
 )
 days.reverse()
 loop = tqdm(days, leave=False)
-exclude_currency = []
 try:
     inserted = 0
+    exclude_currency = []
     for date in loop:
+        for currency, a_date in list(last_valid_date.items()):
+            if date <= last_valid_date[currency]:
+                if currency not in currencies:
+                    currencies.append(currency)
+                del last_valid_date[currency]
+
         for currency in currencies:
             if (date, currency) in xcache:
                 xcache.remove((date, currency))
                 continue
 
-            if currency in before_first_valid_date.items():
-                b_date = before_first_valid_date[currency]
-                if b_date is not None and date <= b_date:
+            if currency in before_first_valid_date:
+                if date <= before_first_valid_date[currency]:
                     exclude_currency.append(currency)
                     del before_first_valid_date[currency]
 
-                    continue  # inner loop
+                continue  # inner loop
 
             if (db_value := db.get_value(date, currency)) is None:
                 loop.set_postfix_str(f"{date} {currency}")
