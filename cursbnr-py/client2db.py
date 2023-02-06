@@ -27,26 +27,27 @@ before_first_valid_date = {
     "ZAR": to_date("2009-03-01"),
     "BGN": to_date("2007-12-02"),
     "RUB": to_date("2007-11-11"),
-    "TRY": to_date('2005-01-02'),
-    "CZK": to_date('2001-11-11'),
-    "HUF": to_date('2001-11-11'),
-    "PLN": to_date('2001-11-11'),
-    "EUR": to_date('1999-01-13'),
-    "AUD": to_date('1998-01-04'),
-    "CAD": to_date('1998-01-04'),
-    "CHF": to_date('1998-01-04'),
-    "DKK": to_date('1998-01-04'),
-    "EGP": to_date('1998-01-04'),
-    "GBP": to_date('1998-01-04'),
-    "JPY": to_date('1998-01-04'),
-    "MDL": to_date('1998-01-04'),
-    "NOK": to_date('1998-01-04'),
-    "SEK": to_date('1998-01-04'),
-    "USD": to_date('1998-01-04'),
-    "XAU": to_date('1998-01-04'),
-    "XDR": to_date('1998-01-04'),
+    "TRY": to_date("2005-01-02"),
+    "CZK": to_date("2001-11-11"),
+    "HUF": to_date("2001-11-11"),
+    "PLN": to_date("2001-11-11"),
+    "EUR": to_date("1999-01-13"),
+    "AUD": to_date("1998-01-04"),
+    "CAD": to_date("1998-01-04"),
+    "CHF": to_date("1998-01-04"),
+    "DKK": to_date("1998-01-04"),
+    "EGP": to_date("1998-01-04"),
+    "GBP": to_date("1998-01-04"),
+    "JPY": to_date("1998-01-04"),
+    "MDL": to_date("1998-01-04"),
+    "NOK": to_date("1998-01-04"),
+    "SEK": to_date("1998-01-04"),
+    "USD": to_date("1998-01-04"),
+    "XAU": to_date("1998-01-04"),
+    "XDR": to_date("1998-01-04"),
+    "HRK": None
 }
-autoexclude = False
+autoexclude = True
 
 # %%
 
@@ -55,6 +56,10 @@ client = CursClient()
 
 # %%
 currencies = list(map(lambda x: x[1], client.getall()))
+for currency in before_first_valid_date.keys():
+    if currency not in currencies:
+        currencies.append(currency)
+
 print(*currencies, sep=", ")
 
 xcache = set()
@@ -76,18 +81,19 @@ try:
                 xcache.remove((date, currency))
                 continue
 
-            if currency in before_first_valid_date:
-                if date <= before_first_valid_date[currency]:
+            if currency in before_first_valid_date.items():
+                b_date = before_first_valid_date[currency]
+                if b_date is not None and date <= b_date:
                     exclude_currency.append(currency)
                     del before_first_valid_date[currency]
 
                     continue  # inner loop
 
-            if (value := db.get_value(date, currency)) is None:
+            if (db_value := db.get_value(date, currency)) is None:
                 loop.set_postfix_str(f"{date} {currency}")
 
                 try:
-                    value = client.getvalue(date, currency)
+                    r_date, r_currency, r_value = client.getvalueadv(date, currency)
                 except WebFault as wf:
                     tqdm.write(f"{wf!s} @{date} {currency})")
                     if autoexclude:
@@ -98,13 +104,15 @@ try:
                             tqdm.write(f"Skipping {currency} before {date}")
                             exclude_currency.append(currency)
 
-                if value is not None:
-                    db.insert_value(date, currency, value, replace=False)
-                    inserted += 1
-                    if inserted >= commit_every_n:
-                        loop.set_postfix_str("COMMITING...  ")
-                        db.commit()
-                        inserted = 0
+                if r_date != date:
+                    continue
+
+                db.insert_value(r_date, r_currency, r_value, replace=False)
+                inserted += 1
+                if inserted >= commit_every_n:
+                    loop.set_postfix_str("COMMITING...  ")
+                    db.commit()
+                    inserted = 0
 
         if exclude_currency:
             for currency in exclude_currency:
@@ -112,7 +120,7 @@ try:
             exclude_currency.clear()
 
             if not currencies:
-                break # outer loop
+                break  # outer loop
 
 
 except KeyboardInterrupt:
