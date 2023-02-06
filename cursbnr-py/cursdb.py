@@ -1,9 +1,9 @@
 import sqlite3
 from datetime import datetime, date as _date, time as _time
-from typing import List, Literal, Sequence
+from typing import Any, List, Literal, Sequence
 import datetime as dt
 
-from curstypes import _DateT, to_date
+from curstypes import _DateT, to_date, to_date_opt, Date, Numeric
 
 from pathlib import Path
 
@@ -19,19 +19,23 @@ class CursDB:
         if not isinstance(dbname, Path):
             dbname = Path(dbname)
 
+        dbname = dbname.absolute().as_uri()
+
         if mode is not None:
             assert mode in self.DB_MODES
             dbname += f"?mode={mode}"
             self._read_only = mode in ("ro",)
 
-        print(dbname)
+        # print(dbname)
         self._db = sqlite3.connect(
-            dbname, detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES
+            dbname,
+            uri=True,
+            detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
         )
 
         db = self._db
         cursor = db.execute(
-            "SELECT COUNT(*) FROM sqlite_schema WHERE name == ?",
+            "SELECT COUNT(*)\nFROM sqlite_schema\nWHERE name == ?",
             ("CURSBNR",),
         )
 
@@ -116,13 +120,40 @@ class CursDB:
         finally:
             cursor.close()
 
+    def get_date_range(self, currency=None) -> tuple[Date | None, Date | None]:
+        def is_str(x):
+            return isinstance(x, str)
+
+        sql = "SELECT MIN(date), MAX(date) FROM CURSBNR"
+        sep = "\nWHERE "
+        _AND_ = " AND "
+        params = []
+
+        if currency is None:
+            pass
+
+        elif isinstance(currency, (list, set, tuple)):
+            assert all(map(is_str, currency))
+            sql += sep + "currency in (" + ", ".join(["?"] * len(currency)) + ")"
+            params.extend(currency)
+            sep = _AND_
+
+        else:
+            assert is_str(currency)
+            sql += sep + "currency = ?"
+            params.append(currency)
+            sep = _AND_
+
+        mind, maxd = self._exec_fetchone(sql, params)
+        return to_date_opt(mind), to_date_opt(maxd)
+
     def select_rows(
         self,
         *,
         date: _DateT | tuple[_DateT, _DateT] | None = None,
         currency: str | list[str] | None = None,
         orderby: str | None = None,
-    ) -> List[tuple[datetime, str, int | float]]:
+    ) -> List[tuple[Date, str, Numeric]]:
         sql = "SELECT date, currency, value FROM CURSBNR"
         params = []
         sep = "\nWHERE "
@@ -184,12 +215,25 @@ class CursDB:
         if orderby:
             sql += " ORDER BY\n    " + ",".join(orderby)
 
-        #print(sql)
+        # print(sql)
+        return self._exec_fetchall(sql, params)
+
+    def close(self):
+        self._db.close()
+
+    def _exec_fetchall(self, sql: str, params: list = []) -> list:
         cursor = self._db.execute(sql, params)
         try:
             return cursor.fetchall()
         finally:
             cursor.close()
 
-    def close(self):
-        self._db.close()
+    def _exec(self, sql: str, params: list = []) -> None:
+        self._db.execute(sql, params).close()
+
+    def _exec_fetchone(self, sql: str, params: list = []) -> Any:
+        cursor = self._db.execute(sql, params)
+        try:
+            return cursor.fetchone()
+        finally:
+            cursor.close()

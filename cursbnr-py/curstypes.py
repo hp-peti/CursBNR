@@ -9,6 +9,12 @@ Numeric = int | float
 DateTime = dt.datetime
 
 
+def to_date_opt(date: _DateT | None) -> Date | None:
+    if date is None or date == "":
+        return None
+    return to_date(date)
+
+
 def to_date(date: _DateT) -> Date:
     if isinstance(date, str):
         return dt.date.fromisoformat(date)
@@ -46,7 +52,7 @@ def extract_dates_values(
 
     rows = map(lambda dcv: (dcv[0], dcv[2]), rows)
 
-    *dates_values, = zip(*rows)
+    (*dates_values,) = zip(*rows)
     if not len(dates_values):
         return list(), list()
 
