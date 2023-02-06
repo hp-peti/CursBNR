@@ -3,7 +3,7 @@ from suds.client import Client as _suds_Client
 
 import datetime as dt
 
-from curstypes import _DateT, to_datetime
+from curstypes import _DateT, to_datetime, Date, to_date, Numeric, to_numeric
 
 
 class CursClient:
@@ -27,15 +27,14 @@ class CursClient:
         level3 = level2[0] if level2 else []
         currencies = level3[0] if len(level3) else []
 
-        def number(x: str) -> int | float:
-            f = float(x)
-            i = int(f)
-            return f if i != f else i
-
         return [
-            (date.date(), str(currency.IDMoneda[0]), number(currency.Value[0]))
+            (to_date(date), str(currency.IDMoneda[0]), to_numeric(currency.Value[0]))
             for currency in currencies
         ]
 
-    def getvalue(self, date: _DateT, currency: str) -> int | float | None:
+    def getvalue(self, date: _DateT, currency: str) -> Numeric | None:
         return self._client.service.getvalue(date, currency)
+
+    def getvalueadv(self, date: _DateT, currency: str) -> Tuple[Date, str, Numeric]:
+        result = self._client.service.getvalueadv(to_datetime(date), currency)
+        return to_date(result.date), result.moneda, to_numeric(result.value)
