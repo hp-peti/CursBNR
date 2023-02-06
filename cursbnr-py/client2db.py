@@ -92,7 +92,7 @@ try:
                     exclude_currency.append(currency)
                     del before_first_valid_date[currency]
 
-                continue  # inner loop
+                    continue  # inner loop
 
             if (db_value := db.get_value(date, currency)) is None:
                 loop.set_postfix_str(f"{date} {currency}")

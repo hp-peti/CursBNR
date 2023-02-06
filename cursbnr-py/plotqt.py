@@ -129,9 +129,6 @@ class CursWindow(QtWidgets.QMainWindow):
 
         top_row = QHBoxLayout()
 
-        button = QPushButton("Plot!")
-        button.pressed.connect(self._replot_xy)
-        top_row.addWidget(button)
 
         self._currency_cb = QComboBox()
         self._currency_cb.addItems(currencies)
@@ -139,12 +136,6 @@ class CursWindow(QtWidgets.QMainWindow):
 
         top_row.addWidget(self._currency_cb)
 
-        self._keep_ckb = QCheckBox("Keep others")
-        top_row.addWidget(self._keep_ckb)
-        self._keep_ckb.setCheckState(False)
-
-        def _uncheck_keep(*args):
-            self._keep_ckb.setCheckState(False)
 
         label1 = QLabel("From:")
         top_row.addWidget(label1)
@@ -162,10 +153,24 @@ class CursWindow(QtWidgets.QMainWindow):
         top_row.addWidget(self._date_to_edit)
 
         # self._currency_cb.activated.connect(_uncheck_keep)
-        self._date_from_edit.dateChanged.connect(_uncheck_keep)
-        self._date_to_edit.dateChanged.connect(_uncheck_keep)
+        button = QPushButton("&Plot!")
+        button.pressed.connect(self._replot_xy)
+        top_row.addWidget(button)
 
         top_row.addStretch()
+
+        ck_label = QLabel("&Keep others:")
+        top_row.addWidget(ck_label)
+        self._keep_ckb = QCheckBox()
+        ck_label.setBuddy(self._keep_ckb)
+        top_row.addWidget(self._keep_ckb)
+        self._keep_ckb.setCheckState(False)
+
+        def _uncheck_keep(*args):
+            self._keep_ckb.setCheckState(False)
+
+        self._date_from_edit.dateChanged.connect(_uncheck_keep)
+        self._date_to_edit.dateChanged.connect(_uncheck_keep)
 
         layout = QVBoxLayout()
         layout.addLayout(top_row)
@@ -184,7 +189,7 @@ class CursWindow(QtWidgets.QMainWindow):
     def _set_minmax_date(self, date_from, date_to) -> None:
         if date_from is not None:
             self._date_from_edit.setMinimumDate(date_from)
-            self._date_to_edit.setMinimumDate(date_to)
+            self._date_to_edit.setMinimumDate(date_from)
             self._date_from_edit.setDate(date_from)
         if date_to is not None:
             self._date_from_edit.setMaximumDate(date_to)
