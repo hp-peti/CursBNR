@@ -24,7 +24,8 @@ class CursDB:
         if mode is not None:
             assert mode in self.DB_MODES
             dbname += f"?mode={mode}"
-            self._read_only = mode in ("ro",)
+
+        self._read_only = mode in ("ro",)
 
         # print(dbname)
         self._db = sqlite3.connect(
