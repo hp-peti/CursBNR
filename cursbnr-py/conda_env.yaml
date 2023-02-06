@@ -18,6 +18,8 @@ dependencies:
   - tk
   - jupyter
   - pyqt # <- can't be built on Raspberry Pi
+  - pyqtgraph
+  - qtpy
   - ipywidgets<8.0 # VS Code doesn't properly support 8.0
   - ipympl
   - tqdm

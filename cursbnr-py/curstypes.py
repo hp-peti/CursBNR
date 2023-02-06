@@ -46,7 +46,11 @@ def extract_dates_values(
 
     rows = map(lambda dcv: (dcv[0], dcv[2]), rows)
 
-    dates, values = zip(*rows)
+    *dates_values, = zip(*rows)
+    if not len(dates_values):
+        return list(), list()
+
+    dates, values = dates_values
     return list(dates), list(values)
 
 

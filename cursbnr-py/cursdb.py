@@ -1,13 +1,30 @@
 import sqlite3
 from datetime import datetime, date as _date, time as _time
-from typing import List, Sequence
+from typing import List, Literal, Sequence
 import datetime as dt
 
 from curstypes import _DateT, to_date
 
+from pathlib import Path
+
 
 class CursDB:
-    def __init__(self, dbname: str):
+    DB_MODES = "ro", "rw", "rwc"
+
+    def __init__(
+        self,
+        dbname: str | Path,
+        mode: Literal["ro", "rw", "rwc"] | None = None,
+    ):
+        if not isinstance(dbname, Path):
+            dbname = Path(dbname)
+
+        if mode is not None:
+            assert mode in self.DB_MODES
+            dbname += f"?mode={mode}"
+            self._read_only = mode in ("ro",)
+
+        print(dbname)
         self._db = sqlite3.connect(
             dbname, detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES
         )
@@ -17,12 +34,13 @@ class CursDB:
             "SELECT COUNT(*) FROM sqlite_schema WHERE name == ?",
             ("CURSBNR",),
         )
+
         try:
             has_table = cursor.fetchone()[0]
         finally:
             cursor.close()
 
-        if not has_table:
+        if not has_table and not self._read_only:
             db.execute(
                 """
                 CREATE TABLE CURSBNR(
@@ -136,11 +154,12 @@ class CursDB:
         if currency is None:
             pass
 
-        elif isinstance(currency, list):
-            sql += sep + "currency in (" + ", ".join(["?"] * len(currency)) + ")"
+        elif isinstance(currency, (list, set, tuple)):
             assert all(map(is_str, currency))
+            sql += sep + "currency in (" + ", ".join(["?"] * len(currency)) + ")"
             params.extend(currency)
             sep = _AND_
+
         else:
             assert is_str(currency)
             sql += sep + "currency = ?"
@@ -165,7 +184,7 @@ class CursDB:
         if orderby:
             sql += " ORDER BY\n    " + ",".join(orderby)
 
-        # print(sql)
+        #print(sql)
         cursor = self._db.execute(sql, params)
         try:
             return cursor.fetchall()
