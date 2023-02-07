@@ -75,11 +75,11 @@ class MplCanvas(FigureCanvasQTAgg):
         n_max_days = max(map(lambda data: n_days(data["x"]), self._plot_data.values()))
 
         match n_max_days:
-            case n if n <= 7:
+            case n if n <= 30:
                 marker = "8"
-            case n if n < 30:
+            case n if n < 90:
                 marker = "o"
-            case n if n < 60:
+            case n if n <= 180:
                 marker = "."
             case _:
                 marker = None
