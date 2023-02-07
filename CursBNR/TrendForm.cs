@@ -466,9 +466,16 @@ namespace CursBNR
                         }
                         while (reader.MoveToNextAttribute());
                     }
-                    if (date.HasValue && rate.HasValue && rate.Value > 0)
+                    if (date.HasValue && rate.HasValue)
                     {
-                        values[date.Value] = rate.Value;
+                        if(rate.HasValue and rate.value > 0)
+                        {
+                            values[date.Value] = rate.Value;
+                        }
+                        else
+                        {
+                            values[date.Value] = Double.NaN
+                        }
                     }
                 } while (reader.ReadToNextSibling(NODE_RATE));
             }
@@ -501,15 +508,15 @@ namespace CursBNR
 
                                     foreach (var rate in curr.Value)
                                     {
-                                        if (rate.Value > 0)
+                                        writer.WriteStartElement(NODE_RATE);
                                         {
-                                            writer.WriteStartElement(NODE_RATE);
+                                            writer.WriteStartAttribute(ATTR_DATE);
                                             {
-                                                writer.WriteStartAttribute(ATTR_DATE);
-                                                {
-                                                    writer.WriteValue(rate.Key.ToString(FMT_DATE, CultureInfo.InvariantCulture));
-                                                }
-                                                writer.WriteEndAttribute();
+                                                writer.WriteValue(rate.Key.ToString(FMT_DATE, CultureInfo.InvariantCulture));
+                                            }
+                                            writer.WriteEndAttribute();
+                                            if (!Double.IsNaN(rate.Value) && rate.Value > 0)
+                                            {
                                                 writer.WriteStartAttribute(ATTR_VALUE);
                                                 {
                                                     writer.WriteValue(rate.Value.ToString(CultureInfo.InvariantCulture));
@@ -559,35 +566,45 @@ namespace CursBNR
                     {
                         value = Double.NaN;
                         bool wait = true;
-                        GetValueCompletedEventHandler getValueCompleted = null;
-                        getValueCompleted = delegate(object sender, GetValueCompletedEventArgs args)
+                        bool completed = false;
+                        getvalueadvCompletedEventHandler getvalueadvCompleted = null;
+                        getvalueadvCompleted = delegate(object sender, getvalueadvCompletedEventArgs args)
                         {
                             if (args.UserState == this)
                             {
-                                wait = false;
-                                curs.GetValueCompleted -= getValueCompleted;
-                                if (args.Error == null && !args.Cancelled)
+                                try
                                 {
-                                    value = args.Result;
+                                    curs.getvalueadvCompleted -= getvalueadvCompleted;
+                                    if (args.Error == null && !args.Cancelled)
+                                    {
+                                        var result = args.Result
+                                        if (result.date == date)
+                                        {
+                                            value = result.value;
+                                        }
+                                        completed = true
+                                    }
+                                }
+                                finally
+                                {
+                                    wait = false;
                                 }
                             }
                         };
-                        curs.GetValueCompleted += getValueCompleted;
-                        curs.GetValueAsync(date, currency, this);
+                        curs.getvalueadvCompleted += getvalueadvCompleted;
+                        curs.getvalueadvAsync(date, currency, this);
 
-                        while (wait && Application.OpenForms.Count > 0)
+                        while (wait)
                         {
                             Application.DoEvents();
+                            if Application.OpenForms.Count <= 0:
+                                curs.getvalueadvCompleted -= getvalueadvCompleted;
+                                return
                             System.Threading.Thread.Sleep(1);
                         }
-                        if (!Double.IsNaN(value))
-                        {
+
+                        if completed:
                             values.Add(date, value);
-                        }
-                        else
-                        {
-                            return;
-                        }
                     }
                     if (!Double.IsNaN(value) && value > 0)
                     {
