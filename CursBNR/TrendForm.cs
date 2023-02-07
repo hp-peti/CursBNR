@@ -466,15 +466,15 @@ namespace CursBNR
                         }
                         while (reader.MoveToNextAttribute());
                     }
-                    if (date.HasValue && rate.HasValue)
+                    if (date.HasValue)
                     {
-                        if(rate.HasValue and rate.value > 0)
+                        if(rate.HasValue && rate.Value > 0)
                         {
                             values[date.Value] = rate.Value;
                         }
                         else
                         {
-                            values[date.Value] = Double.NaN
+                            values[date.Value] = Double.NaN;
                         }
                     }
                 } while (reader.ReadToNextSibling(NODE_RATE));
@@ -577,12 +577,12 @@ namespace CursBNR
                                     curs.getvalueadvCompleted -= getvalueadvCompleted;
                                     if (args.Error == null && !args.Cancelled)
                                     {
-                                        var result = args.Result
+                                        var result = args.Result;
                                         if (result.date == date)
                                         {
                                             value = result.value;
                                         }
-                                        completed = true
+                                        completed = true;
                                     }
                                 }
                                 finally
@@ -597,14 +597,18 @@ namespace CursBNR
                         while (wait)
                         {
                             Application.DoEvents();
-                            if Application.OpenForms.Count <= 0:
+                            if (Application.OpenForms.Count <= 0)
+                            {
                                 curs.getvalueadvCompleted -= getvalueadvCompleted;
-                                return
+                                return;
+                            }
                             System.Threading.Thread.Sleep(1);
                         }
 
-                        if completed:
+                        if (completed)
+                        {
                             values.Add(date, value);
+                        }
                     }
                     if (!Double.IsNaN(value) && value > 0)
                     {
