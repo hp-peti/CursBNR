@@ -73,9 +73,14 @@ class CursDB:
         self,
         date: _DateT,
         currency: str,
-        value: _NumT,
+        value: _NumT | None,
     ):
-        return self.insert_value(date, currency, value, replace=True)
+        if value is not None:
+            self.insert_value(date, currency, value, replace=True)
+            self.unset_no_value(date, currency)
+        else:
+            self.set_no_value(date, currency)
+            self.remove_rows(date, currency)
 
     def insert_value(
         self,

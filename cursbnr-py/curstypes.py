@@ -87,10 +87,17 @@ class CursMap(dict):
                 if value is not None:
                     yield date, currency, value
 
-    def all_rows(self) -> Iterable[Tuple[str, Date, Numeric|None]]:
+    def all_rows(self) -> Iterable[Tuple[Date, str, Numeric|None]]:
         for currency, rates in self.items():
             for date, value in rates.items():
                 yield date, currency, value
+
+    def no_value_rows(self) -> Iterable[Tuple[Date, str]]:
+        for currency, rates in self.items():
+            for date, value in rates.items():
+                if value is None:
+                    yield date, currency
+
 
     def get_size(self):
         return sum(len(submap) for submap in self.values())
