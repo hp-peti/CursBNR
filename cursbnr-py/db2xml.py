@@ -9,6 +9,9 @@ map = CursMap()
 for date, currency, value in db.select_rows():
     map.put_value(date, currency, value)
 
+for date, currency, in db.select_no_value_rows():
+    map.put_value(date, currency, None)
+
 
 write_bnr_xml(map, "bnr.xml")
 

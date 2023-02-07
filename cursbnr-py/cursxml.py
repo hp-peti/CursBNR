@@ -33,7 +33,10 @@ class _BnrXmlHandler(ContentHandler):
             self._currency = attrs["name"]
 
         elif stack == ["values", "currency", "rate"]:
-            self._map.put_value(attrs["date"], self._currency, attrs["value"])
+            if "value" in attrs:
+                self._map.put_value(attrs["date"], self._currency, attrs["value"])
+            else:
+                self._map.put_value(attrs["date"], self._currency, None)
 
     def endElement(self, name):
         stack = self._stack
@@ -61,14 +64,19 @@ def write_bnr_xml(map: CursMap, file):
                 try:
                     for date, value in sorted(map[currency].items()):
                         assert isinstance(date, dt.date)
-                        value = (
-                            "{:.6g}".format(value)
-                            if isinstance(value, float)
-                            else str(int(value))
-                        )
-                        f.write(
-                            f"\t\t<rate date='{escape_attr(date.isoformat())}' value='{escape_attr(value)}' />\n"
-                        )
+                        if value is not None:
+                            value = (
+                                "{:.6g}".format(value)
+                                if isinstance(value, float)
+                                else str(int(value))
+                            )
+                            f.write(
+                                f"\t\t<rate date='{escape_attr(date.isoformat())}' value='{escape_attr(value)}' />\n"
+                            )
+                        else:
+                            f.write(
+                                f"\t\t<rate date='{escape_attr(date.isoformat())}' />\n"
+                            )
                 finally:
                     f.write(f"\t</currency>\n")
         finally:

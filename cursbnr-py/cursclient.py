@@ -14,9 +14,9 @@ class CursClient:
     def lastdate(self) -> dt.date:
         return self._client.service.lastdateinserted().date()
 
-    def getall(
+    def get_all(
         self, date: _DateT | None = None
-    ) -> List[Tuple[dt.date, str, int | float]]:
+    ) -> List[Tuple[str, Numeric]]:
         if date is None:
             date = self.lastdate
         date = to_datetime(date)
@@ -28,13 +28,13 @@ class CursClient:
         currencies = level3[0] if len(level3) else []
 
         return [
-            (to_date(date), str(currency.IDMoneda[0]), to_numeric(currency.Value[0]))
+            (str(currency.IDMoneda[0]), to_numeric(currency.Value[0]))
             for currency in currencies
         ]
 
-    def getvalue(self, date: _DateT, currency: str) -> Numeric | None:
+    def value(self, date: _DateT, currency: str) -> Numeric | None:
         return self._client.service.getvalue(date, currency)
 
-    def getvalueadv(self, date: _DateT, currency: str) -> Tuple[Date, str, Numeric]:
+    def get_value(self, date: _DateT, currency: str) -> Tuple[Date, str, Numeric]:
         result = self._client.service.getvalueadv(to_datetime(date), currency)
         return to_date(result.date), result.moneda, to_numeric(result.value)
