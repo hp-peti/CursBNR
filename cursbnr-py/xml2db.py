@@ -4,6 +4,7 @@ from cursxml import parse_bnr_xml
 from cursdb import CursDB
 
 REMOVE_SUCCESSIVE_EQUAL_VALUES = False
+REPLACE = False
 
 # %%
 db = CursDB("bnr.db")
@@ -38,4 +39,8 @@ if REMOVE_SUCCESSIVE_EQUAL_VALUES:
 
 else:
     for date, currency, value in map.rows():
-        db.insert_value(date, currency, value, replace=True)
+        if db.has_no_value(date, currency):
+            continue
+        db.insert_value(date, currency, value, replace=False)
+
+    db.commit()

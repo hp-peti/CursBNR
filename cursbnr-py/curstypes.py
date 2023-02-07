@@ -24,6 +24,10 @@ def to_date(date: _DateT) -> Date:
         assert isinstance(date, dt.date)
         return date
 
+def to_numeric_opt(x: _NumT | None) -> Numeric | None:
+    if x is None:
+        return None
+    return to_numeric(x)
 
 def to_numeric(x: _NumT) -> Numeric:
     if isinstance(x, int):
@@ -64,12 +68,12 @@ class CursMap(dict):
     def __init__(self):
         pass
 
-    def put_value(self, date: _DateT, currency: str, value: _NumT):
+    def put_value(self, date: _DateT, currency: str, value: _NumT | None):
         assert isinstance(currency, str)
         submap = self.get(currency, None)
         if submap is None:
             self[currency] = (submap := dict())
-        submap[to_date(date)] = to_numeric(value)
+        submap[to_date(date)] = to_numeric_opt(value)
 
     def get_value(self, date: _DateT, currency: str) -> Numeric | None:
         assert isinstance(currency, str)
@@ -78,6 +82,12 @@ class CursMap(dict):
             return submap.get(currency, None)
 
     def rows(self) -> Iterable[Tuple[str, Date, Numeric]]:
+        for currency, rates in self.items():
+            for date, value in rates.items():
+                if value is not None:
+                    yield date, currency, value
+
+    def all_rows(self) -> Iterable[Tuple[str, Date, Numeric|None]]:
         for currency, rates in self.items():
             for date, value in rates.items():
                 yield date, currency, value

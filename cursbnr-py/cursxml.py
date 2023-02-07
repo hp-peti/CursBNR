@@ -33,7 +33,10 @@ class _BnrXmlHandler(ContentHandler):
             self._currency = attrs["name"]
 
         elif stack == ["values", "currency", "rate"]:
-            self._map.put_value(attrs["date"], self._currency, attrs["value"])
+            if "value" in attrs:
+                self._map.put_value(attrs["date"], self._currency, attrs["value"])
+            else:
+                self._map.put_value(attrs["date"], None)
 
     def endElement(self, name):
         stack = self._stack

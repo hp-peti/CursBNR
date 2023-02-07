@@ -5,6 +5,8 @@ from tqdm import tqdm
 from suds import WebFault
 import re
 
+from concurrent.futures import Future, ThreadPoolExecutor
+
 # %%
 from cursdb import CursDB
 from cursclient import CursClient
@@ -60,11 +62,18 @@ db = CursDB("bnr.db")
 client = CursClient()
 
 # %%
-currencies = list(map(lambda x: x[1], client.getall()))
-
+currencies = list(map(lambda x: x[0], client.get_all()))
+print( currencies + list(last_valid_date.keys()))
+all_currencies = list(set(currencies + list(last_valid_date.keys())))
 xcache = set()
-for date, currency, _ in db.select_rows(currency=currencies):
+for date, currency, _ in db.select_rows(currency=all_currencies):
     xcache.add((date, currency))
+
+for date, currency in db.select_no_value_rows(currency=all_currencies):
+    xcache.add((date, currency))
+
+tpx = ThreadPoolExecutor(len(currency) + len(last_valid_date))
+
 
 # %%
 days = list(
@@ -74,50 +83,70 @@ days.reverse()
 loop = tqdm(days, leave=False)
 try:
     inserted = 0
-    exclude_currency = []
-    for date in loop:
-        for currency, a_date in list(last_valid_date.items()):
-            if date <= last_valid_date[currency]:
-                if currency not in currencies:
-                    currencies.append(currency)
-                del last_valid_date[currency]
+    def after_insert():
+        global inserted, commit_every_n, loop, db
+        inserted += 1
+        if inserted >= commit_every_n:
+            with loop.get_lock():
+                loop.set_postfix_str("COMMITING...  ")
+                db.commit()
+            inserted = 0
 
-        for currency in currencies:
-            if (date, currency) in xcache:
-                xcache.remove((date, currency))
-                continue
-
-            if currency in before_first_valid_date:
-                if date <= before_first_valid_date[currency]:
-                    exclude_currency.append(currency)
-                    del before_first_valid_date[currency]
-
-                    continue  # inner loop
-
-            if (db_value := db.get_value(date, currency)) is None:
+    def fetch(date, currency):
+        try:
+            with loop.get_lock():
                 loop.set_postfix_str(f"{date} {currency}")
 
-                try:
-                    r_date, r_currency, r_value = client.getvalueadv(date, currency)
-                except WebFault as wf:
-                    tqdm.write(f"{wf!s} @{date} {currency})")
-                    if autoexclude:
-                        if re.fullmatch(
-                            r".*Object reference not set to an instance of an object\..*",
-                            str(wf),
-                        ):
-                            tqdm.write(f"Skipping {currency} before {date}")
-                            exclude_currency.append(currency)
+            r_date, r_currency, r_value = client.get_value(date, currency)
+        except WebFault as wf:
+            with loop.get_lock():
+                tqdm.write(f"{wf!s} @{date} {currency})")
+            if autoexclude:
+                if re.fullmatch(
+                    r".*Object reference not set to an instance of an object\..*",
+                    str(wf),
+                ):
+                    with loop.get_lock():
+                        tqdm.write(f"Skipping {currency} before {date}")
+                    exclude_currency.append(currency)
 
-                if r_date != date:
-                    continue
+        if r_date != date:
+            return lambda db: db.set_no_value(date, currency)
 
-                db.insert_value(r_date, r_currency, r_value, replace=False)
-                inserted += 1
-                if inserted >= commit_every_n:
-                    loop.set_postfix_str("COMMITING...  ")
-                    db.commit()
-                    inserted = 0
+        else:
+            return lambda db: db.insert_value(r_date, r_currency, r_value, replace=False)
+
+
+    exclude_currency = []
+    for date in loop:
+        futures: list[Future] = []
+
+        try:
+            for currency, a_date in list(last_valid_date.items()):
+                if date <= last_valid_date[currency]:
+                    if currency not in currencies:
+                        currencies.append(currency)
+                    del last_valid_date[currency]
+
+            for currency in currencies:
+                if (date, currency) in xcache:
+                    xcache.remove((date, currency))
+                    continue # inner loop
+
+                if currency in before_first_valid_date:
+                    if date <= before_first_valid_date[currency]:
+                        exclude_currency.append(currency)
+                        del before_first_valid_date[currency]
+
+                        continue  # inner loop
+
+                if (db_value := db.get_value(date, currency)) is None:
+                    futures.append(tpx.submit(fetch, date, currency))
+
+        finally:
+            for future in futures:
+                future.result()(db)
+                after_insert()
 
         if exclude_currency:
             for currency in exclude_currency:
