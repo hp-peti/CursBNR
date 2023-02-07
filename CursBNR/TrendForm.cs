@@ -161,9 +161,8 @@ namespace CursBNR
                 var monthly = !daily && dayWidth * 30 >= fontHeight;
                 var yearly = !daily && !monthly;
 
-                for (int i = 0; i < graph.Count; ++i)
+                for (var date = minDate; date <= maxDate; date = date.AddDays(1))
                 {
-                    var date = graph[i].Date;
                     var month = date.Month;
                     var day = date.Day;
                     var dayOfWeek = date.DayOfWeek;
@@ -248,7 +247,7 @@ namespace CursBNR
 
                     if (draw)
                     {
-                        var x = (float)((graph[i].Date - minDate).TotalDays * scaleX + offsetX);
+                        var x = (float)((date - minDate).TotalDays * scaleX + offsetX);
                         if (format != null)
                         {
                             if (format.Length > 0)
