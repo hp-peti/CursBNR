@@ -72,7 +72,7 @@ for date, currency, _ in db.select_rows(currency=all_currencies):
 for date, currency in db.select_no_value_rows(currency=all_currencies):
     xcache.add((date, currency))
 
-tpx = ThreadPoolExecutor(len(currency) + len(last_valid_date))
+tpx = ThreadPoolExecutor(len(currencies) + len(last_valid_date))
 
 
 # %%
