@@ -3,7 +3,7 @@ from suds.client import Client as _suds_Client
 
 import datetime as dt
 
-from curstypes import _DateT, to_datetime, Date, to_date, Numeric, to_numeric
+from curs.types import _DateT, to_datetime, Date, to_date, Numeric, to_numeric
 
 
 class CursClient:

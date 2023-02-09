@@ -3,7 +3,9 @@
 /Backup
 /bin
 /CursBNR/obj
-cursbnr-py/__pycache__/
+
+__pycache__/
+
 cursbnr-py/*.db
 cursbnr-py/*.db-journal
 cursbnr-py/*.xml

@@ -8,9 +8,9 @@ import re
 from concurrent.futures import Future, ThreadPoolExecutor
 
 # %%
-from cursdb import CursDB
-from cursclient import CursClient
-from curstypes import CursMap, to_date
+from curs.db import CursDB
+from curs.client import CursClient
+from curs.types import CursMap, to_date
 
 
 start_date = "1998-01-01"

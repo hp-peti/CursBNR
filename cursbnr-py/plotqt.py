@@ -10,8 +10,8 @@ from pathlib import Path
 matplotlib.use("Qt5Agg")
 
 import numpy as np
-from cursdb import CursDB
-from curstypes import Date, extract_dates_values, to_date_opt
+from curs.db import CursDB
+from curs.types import Date, extract_dates_values, to_date_opt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from matplotlib.pyplot import cm

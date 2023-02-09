@@ -1,9 +1,9 @@
-from cursxml import write_bnr_xml
-from cursdb import CursDB
-from curstypes import CursMap
+from curs.xml import write_bnr_xml
+from curs.db import CursDB
+from curs.types import CursMap
 
 # %%
-db = CursDB("bnr.db")
+db = CursDB("bnr.db", mode="ro")
 
 map = CursMap()
 for date, currency, value in db.select_rows():

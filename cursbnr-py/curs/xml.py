@@ -1,7 +1,7 @@
 from xml.sax.handler import ContentHandler
 from xml.sax import parse as xml_parse
 from xml.sax.saxutils import escape
-from curstypes import CursMap
+from curs.types import CursMap
 
 import datetime as dt
 

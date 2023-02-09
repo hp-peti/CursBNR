@@ -1,7 +1,7 @@
 # %%
-from curstypes import CursMap
-from cursxml import parse_bnr_xml
-from cursdb import CursDB
+from curs.types import CursMap
+from curs.xml import parse_bnr_xml
+from curs.db import CursDB
 
 
 # %%

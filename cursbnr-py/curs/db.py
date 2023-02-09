@@ -3,7 +3,7 @@ from datetime import datetime, date as _date, time as _time
 from typing import Any, List, Literal 
 import datetime as dt
 
-from curstypes import _DateT, _NumT, to_date, to_date_opt, Date, Numeric, to_numeric
+from curs.types import _DateT, _NumT, to_date, to_date_opt, Date, Numeric, to_numeric
 
 from pathlib import Path
 
