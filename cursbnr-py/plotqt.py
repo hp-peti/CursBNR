@@ -1,11 +1,10 @@
 import sys
+from pathlib import Path
 from typing import Any, List, Mapping, Sequence
 
 import matplotlib
 from dateutil.relativedelta import relativedelta
 from dateutil.utils import today
-
-from pathlib import Path
 
 matplotlib.use("Qt5Agg")
 
@@ -13,6 +12,7 @@ import numpy as np
 from curs.db import CursDB
 from curs.types import Date, extract_dates_values, to_date_opt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 from matplotlib.pyplot import cm
 from qtpy import QtCore, QtGui, QtWidgets
@@ -140,18 +140,20 @@ class CursWindow(QtWidgets.QMainWindow):
 
         top_row.addWidget(self._currency_cb)
 
-        label1 = QLabel("From:")
+        label1 = QLabel("&From:")
         top_row.addWidget(label1)
         self._date_from_edit = QDateEdit()
         self._date_from_edit.setDisplayFormat("yyyy-MM-dd")
+        label1.setBuddy(self._date_from_edit)
 
         top_row.addWidget(self._date_from_edit)
 
-        label2 = QLabel("To:")
+        label2 = QLabel("&To:")
         top_row.addWidget(label2)
 
         self._date_to_edit = QDateEdit()
         self._date_to_edit.setDisplayFormat("yyyy-MM-dd")
+        label2.setBuddy(self._date_from_edit)
 
         top_row.addWidget(self._date_to_edit)
 
@@ -160,19 +162,24 @@ class CursWindow(QtWidgets.QMainWindow):
         button.pressed.connect(self._replot_xy)
         top_row.addWidget(button)
 
-        top_row.addStretch()
-
-        ck_label = QLabel("&Keep others:")
-        top_row.addWidget(ck_label)
-        self._keep_ckb = QCheckBox()
-        ck_label.setBuddy(self._keep_ckb)
+        # ck_label = QLabel("&Keep others:")
+        # top_row.addWidget(ck_label)
+        self._keep_ckb = QCheckBox("&Keep others")
+        # ck_label.setBuddy(self._keep_ckb)
         top_row.addWidget(self._keep_ckb)
         self._keep_ckb.setCheckState(False)
+
+        top_row.addStretch()
 
         layout = QVBoxLayout()
         layout.addLayout(top_row)
         layout.addWidget(plot)
+
         self._plot = plot
+
+        toolbar = NavigationToolbar(plot, self)
+
+        layout.addWidget(toolbar)
 
         center = QWidget()
         center.setLayout(layout)
