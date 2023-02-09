@@ -1,5 +1,5 @@
 import datetime as dt
-from typing import Iterable, List, Tuple
+from typing import Any, Iterable, List, Tuple, Type, TypeVar
 
 _DateT = str | dt.date | dt.datetime
 _NumT = str | int | float
@@ -21,8 +21,23 @@ def to_date(date: _DateT) -> Date:
     elif isinstance(date, dt.datetime):
         return date.date()
     else:
-        assert isinstance(date, dt.date)
-        return date
+        return require_date(date)
+
+_T = TypeVar("_T")
+
+def _require_(_type: Type[_T], _val) -> _T:
+    if not isinstance(_val, _type):
+        raise TypeError(f"{_val}: expected {_type}, got {type(_val)}")
+    return _val
+
+def require_date(date) -> Date:
+    return _require_(Date, date)
+
+def require_datetime(datetime) -> DateTime:
+    return _require_(DateTime, datetime)
+
+def require_str(s) -> str:
+    return _require_(str, s)
 
 def to_numeric_opt(x: _NumT | None) -> Numeric | None:
     if x is None:
@@ -72,7 +87,8 @@ class CursMap(dict):
         assert isinstance(currency, str)
         submap = self.get(currency, None)
         if submap is None:
-            self[currency] = (submap := dict())
+            submap = dict()
+            self[currency] = submap
         submap[to_date(date)] = to_numeric_opt(value)
 
     def get_value(self, date: _DateT, currency: str) -> Numeric | None:

@@ -1,11 +1,25 @@
 import sqlite3
 from datetime import datetime, date as _date, time as _time
-from typing import Any, List, Literal 
+from typing import Any, Iterable, List, Literal, Tuple
 import datetime as dt
 
-from curs.types import _DateT, _NumT, to_date, to_date_opt, Date, Numeric, to_numeric
+from curs.types import (
+    _DateT,
+    _NumT,
+    to_date,
+    to_date_opt,
+    Date,
+    Numeric,
+    to_numeric,
+    require_str,
+)
 
 from pathlib import Path
+
+_OptValueRowT = Tuple[_DateT, str, _NumT | None]
+_ValueRowT = Tuple[_DateT, str, _NumT]
+_NoValueRowT = Tuple[_DateT, str]
+_OptOrNoValueRowT = _OptValueRowT | _NoValueRowT
 
 
 class CursDB:
@@ -22,13 +36,16 @@ class CursDB:
         dbname = dbname.absolute().as_uri()
 
         if mode is not None:
-            assert mode in self.DB_MODES
+            if mode not in self.DB_MODES:
+                raise ValueError(
+                    f"invalid mode {mode!r}, need one of {self.DB_MODES!r}"
+                )
             dbname += f"?mode={mode}"
 
         self._read_only = mode in ("ro",)
 
         # print(dbname)
-        self._db = sqlite3.connect(
+        self._conn = sqlite3.connect(
             dbname,
             uri=True,
             detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
@@ -41,30 +58,43 @@ class CursDB:
             self._create_no_value_table()
 
     def _has_table(self, tablename: str):
-        return self._exec_fetchone(
-            "SELECT COUNT(*)\nFROM sqlite_schema\nWHERE name == ?",
-            (tablename,),
-        )[0] > 0
+        return (
+            self._exec_fetchone(
+                "SELECT COUNT(*)\nFROM sqlite_schema\nWHERE name == ?",
+                (tablename,),
+            )[0]
+            > 0
+        )
 
+    @property
+    def connection(self) -> sqlite3.Connection:
+        return self._conn
+
+    @property
+    def in_transaction(self):
+        return self._conn.in_transaction
+
+    def begin(self):
+        self._exec("BEGIN")
 
     def close(self):
-        self._db.close()
+        self._conn.close()
 
     def commit(self):
-        self._db.commit()
+        self._conn.commit()
 
     def rollback(self):
-        self._db.rollback()
+        self._conn.rollback()
 
     def get_currencies(self) -> list[str]:
         rows = self._exec_fetchall("SELECT currency FROM CURSBNR GROUP BY currency")
         return [currency for (currency,) in rows]
 
     def get_date_range(self, currency=None) -> tuple[Date | None, Date | None]:
-        def is_str(x):
-            return isinstance(x, str)
 
-        sql, params = self._sql_where("SELECT MIN(date), MAX(date) FROM CURSBNR", currency=currency)
+        sql, params = self._sql_where(
+            "SELECT MIN(date), MAX(date) FROM CURSBNR", currency=currency
+        )
 
         mind, maxd = self._exec_fetchone(sql, params)
         return to_date_opt(mind), to_date_opt(maxd)
@@ -74,13 +104,73 @@ class CursDB:
         date: _DateT,
         currency: str,
         value: _NumT | None,
-    ):
+    ) -> None:
+        if not self.in_transaction:
+            self.begin()
+
         if value is not None:
             self.insert_value(date, currency, value, replace=True)
             self.unset_no_value(date, currency)
         else:
             self.set_no_value(date, currency)
             self.remove_rows(date, currency)
+
+    def put_rows(self, rows: Iterable[_OptValueRowT]) -> None:
+        value_rows: List[_ValueRowT] = []
+        no_value_rows: List[_NoValueRowT] = []
+
+        for date, currency, value in rows:
+            if value is not None:
+                value_rows.append((date, currency, value))
+            else:
+                no_value_rows.append((date, currency))
+
+        if not self.in_transaction:
+            self.begin()
+
+        self.insert_many_values(value_rows, replace=True)
+        self.unset_many_no_values(value_rows)
+        self.set_many_no_values(no_value_rows)
+        self.delete_many_values(no_value_rows)
+
+    def insert_many_values(
+        self, rows: Iterable[_ValueRowT], *, replace: bool | None = None
+    ) -> None:
+        value_rows = (
+            (to_date(date), require_str(currency), to_numeric(value))
+            for date, currency, value in rows
+        )
+        return self._exec_many(
+            "INSERT"
+            + self._sql_or_action(replace=replace)
+            + " INTO CURSBNR (date, currency, value) VALUES (?, ?, ?)",
+            value_rows,
+        )
+
+    def delete_many_values(self, rows: Iterable[_OptOrNoValueRowT]) -> None:
+        no_value_rows = (
+            (to_date(date), require_str(currency)) for date, currency, *_ in rows
+        )
+        return self._exec_many(
+            "DELETE FROM CURSBNR WHERE date = ? AND currency = ?", no_value_rows
+        )
+
+    def unset_many_no_values(self, rows: Iterable[_OptOrNoValueRowT]) -> None:
+        no_value_rows = (
+            (to_date(date), require_str(currency)) for date, currency, *_ in rows
+        )
+        return self._exec_many(
+            "DELETE FROM CURSBNR_NO_VALUE WHERE date = ? AND currency = ?", no_value_rows
+        )
+
+    def set_many_no_values(self, rows: Iterable[_OptOrNoValueRowT]):
+        no_value_rows = (
+            (to_date(date), require_str(currency)) for date, currency, *_ in rows
+        )
+        return self._exec_many(
+            "INSERT OR IGNORE INTO CURSBNR_NO_VALUE (date, currency) VALUES (?, ?)",
+            no_value_rows,
+        )
 
     def insert_value(
         self,
@@ -91,20 +181,18 @@ class CursDB:
         replace: bool | None = None,
     ):
         date = to_date(date)
-        assert isinstance(currency, str)
+        require_str(currency)
         value = to_numeric(value)
-        _or_action = {None: "", True: "OR REPLACE", False: "OR IGNORE"}[replace]
         self._exec(
             "INSERT "
-            + _or_action
+            + self._sql_or_action(replace=replace)
             + " INTO CURSBNR (date, currency, value) VALUES (?, ?, ?)",
             (date, currency, value),
         )
 
-
     def get_value(self, date: _DateT, currency: str) -> Numeric | None:
         date = to_date(date)
-        assert isinstance(currency, str)
+        require_str(currency)
         result = self._exec_fetchone(
             "SELECT value FROM CURSBNR WHERE date=? AND CURRENCY=?",
             [date, currency],
@@ -112,17 +200,25 @@ class CursDB:
         if result is not None:
             return result[0]
 
-
     def remove_rows(
         self,
         date: _DateT | tuple[_DateT, _DateT] | None = None,
         currency: str | list[str] | None = None,
     ):
-        sql, params = self._sql_where("DELETE FROM CURSBNR", date=date, currency=currency)
+        sql, params = self._sql_where(
+            "DELETE FROM CURSBNR", date=date, currency=currency
+        )
 
         self._exec(sql, params)
 
- 
+    def remove_many_rows(self, dates_currencies: Iterable[Tuple[_DateT, str]]):
+        sql = "DELETE FROM CURSBNR WHERE date = ? AND currency = ?"
+        param_rows = (
+            (to_date(date), require_str(currency))
+            for date, currency in dates_currencies
+        )
+        self._exec_many(sql, param_rows)
+
     def select_rows(
         self,
         *,
@@ -158,7 +254,7 @@ class CursDB:
 
     def has_no_value(self, date: _DateT, currency: str) -> bool:
         date = to_date(date)
-        assert isinstance(currency, str)
+        require_str(currency)
         result = self._exec_fetchone(
             "SELECT COUNT(*) FROM CURSBNR_NO_VALUE WHERE date=? AND CURRENCY=?",
             [date, currency],
@@ -171,7 +267,7 @@ class CursDB:
         currency: str,
     ):
         date = to_date(date)
-        assert isinstance(currency, str)
+        require_str(currency)
 
         self._exec(
             "INSERT OR IGNORE INTO CURSBNR_NO_VALUE (date, currency) VALUES (?, ?)",
@@ -183,7 +279,9 @@ class CursDB:
         date: _DateT | tuple[_DateT, _DateT] | None = None,
         currency: str | list[str] | None = None,
     ):
-        sql, params = self._sql_where("DELETE FROM CURSBNR_NO_VALUE", date=date, currency=currency)
+        sql, params = self._sql_where(
+            "DELETE FROM CURSBNR_NO_VALUE", date=date, currency=currency
+        )
 
         self._exec(sql, params)
 
@@ -228,21 +326,28 @@ class CursDB:
     # ---------
 
     def _exec_fetchall(self, sql: str, params: list = []) -> list:
-        cursor = self._db.execute(sql, params)
+        cursor = self._conn.execute(sql, params)
         try:
             return cursor.fetchall()
         finally:
             cursor.close()
 
     def _exec(self, sql: str, params: list = []) -> None:
-        self._db.execute(sql, params).close()
+        self._conn.execute(sql, params).close()
 
     def _exec_fetchone(self, sql: str, params: list = []) -> Any:
-        cursor = self._db.execute(sql, params)
+        cursor = self._conn.execute(sql, params)
         try:
             return cursor.fetchone()
         finally:
             cursor.close()
+
+    def _exec_many(self, sql: str, param_rows: Iterable[list]) -> None:
+        self._conn.executemany(sql, param_rows).close()
+
+    @staticmethod
+    def _sql_or_action(*, replace: bool | None = None):
+        return {None: "", True: " OR REPLACE", False: " OR IGNORE"}[replace]
 
     @staticmethod
     def _sql_where(
@@ -255,9 +360,6 @@ class CursDB:
         params = list(params)
         sep = "\nWHERE "
         _AND_ = " AND "
-
-        def is_str(x):
-            return isinstance(x, str)
 
         if date is None:
             pass
@@ -284,13 +386,12 @@ class CursDB:
             pass
 
         elif isinstance(currency, (list, set, tuple)):
-            assert all(map(is_str, currency))
             sql += sep + "currency in (" + ", ".join(["?"] * len(currency)) + ")"
-            params.extend(currency)
+            params.extend(map(require_str, currency))
             sep = _AND_
 
         else:
-            assert is_str(currency)
+            require_str(currency)
             sql += sep + "currency = ?"
             params.append(currency)
             sep = _AND_
