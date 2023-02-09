@@ -1,5 +1,5 @@
 import sys
-from typing import List, Sequence
+from typing import Any, List, Mapping, Sequence
 
 import matplotlib
 from dateutil.relativedelta import relativedelta
@@ -35,15 +35,17 @@ class MplCanvas(FigureCanvasQTAgg):
         super(MplCanvas, self).__init__(Figure((6.4, 4.8), dpi=dpi))
         # self.figure.set_rasterized(True)
 
-    def set_plot_data(self, currency: str, x, y, *, color=None, remove_existing=True):
-        if remove_existing:
-            self._plot_data = {}
-
-        self._plot_data[currency] = {"x": x, "y": y, "color": color}
-
+    def set_plot_data(self, data: Mapping[str, Mapping[str, Any]]):
+        new_plot_data = dict()
+        for currency, data in data.items():
+            self._add_plot_data(new_plot_data, currency, **data)
+        self._plot_data = new_plot_data
         self._replot()
-
         self.draw()
+
+    @staticmethod
+    def _add_plot_data(_plot_data, /, currency: str, *, x, y, color=None):
+        _plot_data[currency] = {"x": x, "y": y, "color": color}
 
     def _resize_figure(self, oldsize, newsize):
         if oldsize == newsize:
@@ -108,6 +110,7 @@ class CursWindow(QtWidgets.QMainWindow):
         assert isinstance(currencies, list) and all(
             map(lambda s: isinstance(s, str), currencies)
         )
+        self._past_currencies = set()
 
         super(CursWindow, self).__init__(*args, **kwargs)
 
@@ -115,13 +118,13 @@ class CursWindow(QtWidgets.QMainWindow):
 
         self._replot_xy()
 
+    @staticmethod
+    def _generate_colors(length):
+        return cm.rainbow(np.linspace(0, 1, length)) * np.array([0.75, 0.75, 0.75, 1])
 
     def _initUI(
         self, date_from: Date | None, date_to: Date | None, currencies: List[str]
     ):
-        self._colors = cm.rainbow(np.linspace(0, 1, len(currencies))) * np.array(
-            [0.75, 0.75, 0.75, 1]
-        )
 
         # Create the maptlotlib FigureCanvas object,
         # which defines a single set of axes as self.axes.
@@ -129,13 +132,11 @@ class CursWindow(QtWidgets.QMainWindow):
 
         top_row = QHBoxLayout()
 
-
         self._currency_cb = QComboBox()
         self._currency_cb.addItems(currencies)
         self._currency_cb.setCurrentText("EUR")
 
         top_row.addWidget(self._currency_cb)
-
 
         label1 = QLabel("From:")
         top_row.addWidget(label1)
@@ -165,12 +166,6 @@ class CursWindow(QtWidgets.QMainWindow):
         ck_label.setBuddy(self._keep_ckb)
         top_row.addWidget(self._keep_ckb)
         self._keep_ckb.setCheckState(False)
-
-        def _uncheck_keep(*args):
-            self._keep_ckb.setCheckState(False)
-
-        self._date_from_edit.dateChanged.connect(_uncheck_keep)
-        self._date_to_edit.dateChanged.connect(_uncheck_keep)
 
         layout = QVBoxLayout()
         layout.addLayout(top_row)
@@ -202,11 +197,24 @@ class CursWindow(QtWidgets.QMainWindow):
         currency = self._currency_cb.currentText()
         n = self._currency_cb.currentIndex()
         keep = self._keep_ckb.checkState()
-        rows = db.select_rows(date=(from_date, to_date), currency=currency)
-        x, y = extract_dates_values(rows, currency=None)
-        self._plot.set_plot_data(
-            currency, x, y, color=self._colors[n], remove_existing=not keep
+        currencies = {currency}
+        if self._keep_ckb.isChecked():
+            currencies.update(self._past_currencies)
+
+        rows = self._db.select_rows(
+            date=(from_date, to_date), currency=list(currencies)
         )
+        colors = self._generate_colors(len(currencies))
+
+        data = {
+            currency: (lambda x, y: {"x": x, "y": y, "color": colors[i]})(
+                *extract_dates_values(rows, currency=currency)
+            )
+            for i, currency in enumerate(sorted(currencies))
+        }
+
+        self._plot.set_plot_data(data)
+        self._past_currencies = currencies
 
 
 db = CursDB("bnr.db", mode="ro")
