@@ -5,6 +5,8 @@ import matplotlib
 from dateutil.relativedelta import relativedelta
 from dateutil.utils import today
 
+from pathlib import Path
+
 matplotlib.use("Qt5Agg")
 
 import numpy as np
@@ -217,7 +219,7 @@ class CursWindow(QtWidgets.QMainWindow):
         self._past_currencies = currencies
 
 
-db = CursDB("bnr.db", mode="ro")
+db = CursDB(Path(__file__).parents[0] / "bnr.db", mode="ro")
 go_back = relativedelta(years=3, months=0, days=0)
 
 from_date, to_date = db.get_date_range()
