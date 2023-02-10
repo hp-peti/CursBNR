@@ -1,5 +1,6 @@
 # %%
 from pathlib import Path
+from typing import Tuple
 from dateutil.relativedelta import relativedelta
 from dateutil.rrule import rrule, DAILY
 from tqdm import tqdm
@@ -7,17 +8,21 @@ from suds import WebFault
 import re
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
-from threading import local as threading_local
+import threading
 
 # %%
 from curs.db import CursDB
 from curs.client import CursClient
-from curs.types import CursMap, to_date
+from curs.types import CursMap, to_date, Date, Numeric
 
 #import logging
 #logging.basicConfig(level='DEBUG')
 
 start_date = "1998-01-01"
+#start_date = "2023-01-01"
+db_name = "bnr.db"
+#db_name = ".tmp.db"
+
 commit_every_n = 1024
 before_first_valid_date = {
     "THB": to_date("2017-06-18"),
@@ -62,15 +67,16 @@ autoexclude = True
 
 # %%
 
-db = CursDB(Path(__file__).parent / "bnr.db")
+db = CursDB(Path(__file__).parent / db_name)
 
 # %%
 
-thread_local = threading_local()
-def get_client(use_local_wsdl: bool = False) -> CursClient:
+thread_local = threading.local()
+thread_lock = threading.Lock()
+def get_client() -> CursClient:
     global thread_local
     if not hasattr(thread_local,"client"):
-        thread_local.client = CursClient(use_local_wsdl=use_local_wsdl)
+        thread_local.client = CursClient(use_local_wsdl=not True)
     return thread_local.client
 
 # %%
@@ -78,10 +84,10 @@ def get_client(use_local_wsdl: bool = False) -> CursClient:
 client = get_client()
 
 # %%
-if 0:
+if True:
     currencies = list(map(lambda x: x[0], client.get_all()))
 else:
-    currencies = list(last_valid_date.keys())
+    currencies = list(before_first_valid_date.keys())
 
 all_currencies = sorted(list(set(currencies + list(last_valid_date.keys()))))
 print(" ".join(all_currencies))
@@ -102,36 +108,36 @@ days = list(
 )
 days.reverse()
 loop = tqdm(days, leave=False)
+
 try:
     inserted = 0
-    def after_insert():
+    def after_insert(count: int):
         global inserted, commit_every_n, loop, db
-        inserted += 1
+        inserted += count
         if inserted >= commit_every_n:
             loop.set_postfix_str("COMMITING...  ")
             db.commit()
             inserted = 0
 
-    def fetch(date, currency):
+    def fetch(date, currency) -> Tuple[Date, str, Numeric | None]:
         try:
             loop.set_postfix_str(f"{date} {currency}")
-
             r_date, r_currency, r_value = get_client().get_value(date, currency)
         except WebFault as wf:
-            tqdm.write(f"{wf!s} @{date} {currency})")
-            if autoexclude:
-                if re.fullmatch(
-                    r".*Object reference not set to an instance of an object\..*",
-                    str(wf),
-                ):
-                    tqdm.write(f"Skipping {currency} before {date}")
-                    exclude_currency.append(currency)
+            with thread_lock:
+                tqdm.write(f"{wf!s} @{date} {currency})")
+                if autoexclude:
+                    if re.fullmatch(
+                        r".*Object reference not set to an instance of an object\..*",
+                        str(wf),
+                    ):
+                            tqdm.write(f"Skipping {currency} before {date}")
+                            exclude_currency.append(currency)
 
         if r_date != date:
-            return lambda db: db.set_no_value(date, currency)
-
+            return (date, currency, None)
         else:
-            return lambda db: db.insert_value(r_date, r_currency, r_value, replace=False)
+            return (r_date, r_currency, r_value)
 
 
     exclude_currency = []
@@ -159,12 +165,14 @@ try:
 
                 if (db_value := db.get_value(date, currency)) is None:
                     futures.append(tpx.submit(fetch, date, currency))
-                    time.sleep(0)
+                    time.sleep(0.001)
 
         finally:
-            for future in futures:
-                future.result()(db)
-                after_insert()
+            def get_result(f: Future): return f.result()
+            results = list(map(get_result, futures))
+            futures.clear()
+            db.put_rows(results)
+            after_insert(len(results))
 
         if exclude_currency:
             for currency in exclude_currency:

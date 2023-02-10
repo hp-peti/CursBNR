@@ -11,7 +11,7 @@ class CursClient:
     def __init__(self, use_local_wsdl: bool = False):
         url = "http://www.infovalutar.ro/curs.asmx?wsdl"
         if use_local_wsdl:
-            url = (Path(__file__).parent / "curs.wsdl").as_uri()
+            url = (Path(__file__).resolve().parent / "curs.wsdl").as_uri()
         self._client = _suds_Client(url)
 
     @property
