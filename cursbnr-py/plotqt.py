@@ -49,19 +49,20 @@ class MplCanvas(FigureCanvasQTAgg):
     def _add_plot_data(_plot_data, /, currency: str, *, x, y, color=None):
         _plot_data[currency] = {"x": x, "y": y, "color": color}
 
-    def _resize_figure(self, oldsize, newsize):
-        if oldsize == newsize:
-            return
+    if False: # due to navigation toolbar
+        def _resize_figure(self, oldsize, newsize):
+            if oldsize == newsize:
+                return
 
-        fig: Figure = self.figure
+            fig: Figure = self.figure
 
-        fig.set_size_inches(
-            newsize.width() / fig.get_dpi(),
-            newsize.height() / fig.get_dpi(),
-            forward=True,
-        )
+            fig.set_size_inches(
+                newsize.width() / fig.get_dpi(),
+                newsize.height() / fig.get_dpi(),
+                forward=True,
+            )
 
-        self._replot()
+            self._replot()
 
     def _replot(self):
         fig: Figure = self.figure
@@ -95,13 +96,15 @@ class MplCanvas(FigureCanvasQTAgg):
             axes.plot(x, y, label=label, marker=marker, color=data["color"])
 
         fig.autofmt_xdate(rotation=45)
+        fig.set_tight_layout(True)
         axes.grid(True, which="both", axis="y")
         axes.set_ylabel("RON")
         axes.legend()
 
-    def resizeEvent(self, event):
-        self._resize_figure(event.oldSize(), event.size())
-        return super().resizeEvent(event)
+    if False: # due to navigation toolbar
+        def resizeEvent(self, event):
+            self._resize_figure(event.oldSize(), event.size())
+            return super().resizeEvent(event)
 
 
 class CursWindow(QtWidgets.QMainWindow):
