@@ -1,10 +1,12 @@
+from pathlib import Path
 from curs.xml import write_bnr_xml
 from curs.db import CursDB
 from curs.types import CursMap
 
+
 # %%
 print("Opening database...")
-db = CursDB("bnr.db", mode="ro")
+db = CursDB(Path(__file__).parent / "bnr.db", mode="ro")
 
 print("Retrieving items...")
 map = CursMap()

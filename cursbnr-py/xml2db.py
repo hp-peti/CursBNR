@@ -1,11 +1,13 @@
 # %%
+from pathlib import Path
 from curs.types import CursMap
 from curs.xml import parse_bnr_xml
 from curs.db import CursDB
 
+
 # %%
 print("Opening database...")
-db = CursDB("bnr.db")
+db = CursDB(Path(__file__).parent / "bnr.db")
 
 # %%
 print("Parsing XML...")
