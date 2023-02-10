@@ -6,6 +6,7 @@ import datetime as dt
 
 from curs.types import _DateT, to_datetime, Date, to_date, Numeric, to_numeric
 
+from pathlib import Path
 
 class CursClient:
     def __init__(self, use_local_wsdl: bool = False):

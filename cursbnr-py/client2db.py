@@ -15,6 +15,7 @@ from curs.db import CursDB
 from curs.client import CursClient
 from curs.types import CursMap, to_date, Date, Numeric
 
+from pathlib import Path
 #import logging
 #logging.basicConfig(level='DEBUG')
 
