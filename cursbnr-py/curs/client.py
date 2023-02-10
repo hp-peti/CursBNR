@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import List, Tuple
 from suds.client import Client as _suds_Client
 
@@ -7,16 +8,17 @@ from curs.types import _DateT, to_datetime, Date, to_date, Numeric, to_numeric
 
 
 class CursClient:
-    def __init__(self):
-        self._client = _suds_Client("http://www.infovalutar.ro/curs.asmx?wsdl")
+    def __init__(self, use_local_wsdl: bool = False):
+        url = "http://www.infovalutar.ro/curs.asmx?wsdl"
+        if use_local_wsdl:
+            url = (Path(__file__).parent / "curs.wsdl").as_uri()
+        self._client = _suds_Client(url)
 
     @property
     def lastdate(self) -> dt.date:
         return self._client.service.lastdateinserted().date()
 
-    def get_all(
-        self, date: _DateT | None = None
-    ) -> List[Tuple[str, Numeric]]:
+    def get_all(self, date: _DateT | None = None) -> List[Tuple[str, Numeric]]:
         if date is None:
             date = self.lastdate
         date = to_datetime(date)

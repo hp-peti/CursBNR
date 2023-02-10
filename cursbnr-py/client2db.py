@@ -1,17 +1,21 @@
 # %%
+from pathlib import Path
 from dateutil.relativedelta import relativedelta
 from dateutil.rrule import rrule, DAILY
 from tqdm import tqdm
 from suds import WebFault
 import re
-
+import time
 from concurrent.futures import Future, ThreadPoolExecutor
+from threading import local as threading_local
 
 # %%
 from curs.db import CursDB
 from curs.client import CursClient
 from curs.types import CursMap, to_date
 
+#import logging
+#logging.basicConfig(level='DEBUG')
 
 start_date = "1998-01-01"
 commit_every_n = 1024
@@ -58,13 +62,30 @@ autoexclude = True
 
 # %%
 
-db = CursDB("bnr.db")
-client = CursClient()
+db = CursDB(Path(__file__).parent / "bnr.db")
 
 # %%
-currencies = list(map(lambda x: x[0], client.get_all()))
-print( currencies + list(last_valid_date.keys()))
-all_currencies = list(set(currencies + list(last_valid_date.keys())))
+
+thread_local = threading_local()
+def get_client(use_local_wsdl: bool = False) -> CursClient:
+    global thread_local
+    if not hasattr(thread_local,"client"):
+        thread_local.client = CursClient(use_local_wsdl=use_local_wsdl)
+    return thread_local.client
+
+# %%
+
+client = get_client()
+
+# %%
+if 0:
+    currencies = list(map(lambda x: x[0], client.get_all()))
+else:
+    currencies = list(last_valid_date.keys())
+
+all_currencies = sorted(list(set(currencies + list(last_valid_date.keys()))))
+print(" ".join(all_currencies))
+
 xcache = set()
 for date, currency, _ in db.select_rows(currency=all_currencies):
     xcache.add((date, currency))
@@ -87,27 +108,23 @@ try:
         global inserted, commit_every_n, loop, db
         inserted += 1
         if inserted >= commit_every_n:
-            with loop.get_lock():
-                loop.set_postfix_str("COMMITING...  ")
-                db.commit()
+            loop.set_postfix_str("COMMITING...  ")
+            db.commit()
             inserted = 0
 
     def fetch(date, currency):
         try:
-            with loop.get_lock():
-                loop.set_postfix_str(f"{date} {currency}")
+            loop.set_postfix_str(f"{date} {currency}")
 
-            r_date, r_currency, r_value = client.get_value(date, currency)
+            r_date, r_currency, r_value = get_client().get_value(date, currency)
         except WebFault as wf:
-            with loop.get_lock():
-                tqdm.write(f"{wf!s} @{date} {currency})")
+            tqdm.write(f"{wf!s} @{date} {currency})")
             if autoexclude:
                 if re.fullmatch(
                     r".*Object reference not set to an instance of an object\..*",
                     str(wf),
                 ):
-                    with loop.get_lock():
-                        tqdm.write(f"Skipping {currency} before {date}")
+                    tqdm.write(f"Skipping {currency} before {date}")
                     exclude_currency.append(currency)
 
         if r_date != date:
@@ -142,6 +159,7 @@ try:
 
                 if (db_value := db.get_value(date, currency)) is None:
                     futures.append(tpx.submit(fetch, date, currency))
+                    time.sleep(0)
 
         finally:
             for future in futures:
