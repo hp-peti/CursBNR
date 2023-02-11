@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from pathlib import Path
 from curs.xml import write_bnr_xml
 from curs.db import CursDB

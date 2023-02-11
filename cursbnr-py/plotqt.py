@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import sys
 from pathlib import Path
 from typing import Any, List, Mapping, Sequence
@@ -71,6 +73,9 @@ class MplCanvas(FigureCanvasQTAgg):
 
         fig.clear()
         axes = fig.add_subplot(111)
+        axes.locator_params(axis='x', tight=True, nbins=64)
+        axes.locator_params(axis='y', tight=True, nbins=48)
+        axes.tick_params(labelsize='small')
 
         def n_days(x: Sequence[Date]):
             if not len(x):
@@ -92,6 +97,7 @@ class MplCanvas(FigureCanvasQTAgg):
         for label, data in self._plot_data.items():
             x = data["x"]
             y = data["y"]
+
 
             axes.plot(x, y, label=label, marker=marker, color=data["color"])
 
@@ -187,6 +193,7 @@ class CursWindow(QtWidgets.QMainWindow):
         center = QWidget()
         center.setLayout(layout)
 
+        self.setWindowTitle("CursDB plotter")
         self.setCentralWidget(center)
 
         self._set_minmax_date(date_from, date_to)

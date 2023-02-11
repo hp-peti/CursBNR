@@ -1,6 +1,8 @@
+from functools import partial
+from itertools import starmap
 import sqlite3
 from datetime import datetime, date as _date, time as _time
-from typing import Any, Iterable, List, Literal, Tuple
+from typing import Any, Callable, Iterable, Literal, NamedTuple, Type, TypeVar
 import datetime as dt
 
 from curs.types import (
@@ -12,14 +14,19 @@ from curs.types import (
     Numeric,
     to_numeric,
     require_str,
+    ValueRow,
+    NoValueRow,
 )
 
 from pathlib import Path
 
-_OptValueRowT = Tuple[_DateT, str, _NumT | None]
-_ValueRowT = Tuple[_DateT, str, _NumT]
-_NoValueRowT = Tuple[_DateT, str]
+_OptValueRowT = tuple[_DateT, str, _NumT | None]
+_ValueRowT = tuple[_DateT, str, _NumT]
+_NoValueRowT = tuple[_DateT, str]
 _OptOrNoValueRowT = _OptValueRowT | _NoValueRowT
+
+_T = TypeVar("_T")
+_NamedTuple_T = TypeVar("_NamedTuple_T", bound=NamedTuple)
 
 
 class CursDB:
@@ -87,8 +94,7 @@ class CursDB:
         self._conn.rollback()
 
     def get_currencies(self) -> list[str]:
-        rows = self._exec_fetchall("SELECT currency FROM CURSBNR GROUP BY currency")
-        return [currency for (currency,) in rows]
+        return self._exec_fetch_column("SELECT currency FROM CURSBNR GROUP BY currency", value=str)
 
     def get_date_range(self, currency=None) -> tuple[Date | None, Date | None]:
 
@@ -116,8 +122,8 @@ class CursDB:
             self.remove_rows(date, currency)
 
     def put_rows(self, rows: Iterable[_OptValueRowT]) -> None:
-        value_rows: List[_ValueRowT] = []
-        no_value_rows: List[_NoValueRowT] = []
+        value_rows: list[_ValueRowT] = []
+        no_value_rows: list[_NoValueRowT] = []
 
         for date, currency, value in rows:
             if value is not None:
@@ -160,7 +166,8 @@ class CursDB:
             (to_date(date), require_str(currency)) for date, currency, *_ in rows
         )
         return self._exec_many(
-            "DELETE FROM CURSBNR_NO_VALUE WHERE date = ? AND currency = ?", no_value_rows
+            "DELETE FROM CURSBNR_NO_VALUE WHERE date = ? AND currency = ?",
+            no_value_rows,
         )
 
     def set_many_no_values(self, rows: Iterable[_OptOrNoValueRowT]):
@@ -211,7 +218,7 @@ class CursDB:
 
         self._exec(sql, params)
 
-    def remove_many_rows(self, dates_currencies: Iterable[Tuple[_DateT, str]]):
+    def remove_many_rows(self, dates_currencies: Iterable[tuple[_DateT, str]]):
         sql = "DELETE FROM CURSBNR WHERE date = ? AND currency = ?"
         param_rows = (
             (to_date(date), require_str(currency))
@@ -225,7 +232,7 @@ class CursDB:
         date: _DateT | tuple[_DateT, _DateT] | None = None,
         currency: str | list[str] | None = None,
         orderby: str | None = None,
-    ) -> list[tuple[Date, str, Numeric]]:
+    ) -> list[ValueRow]:
 
         sql, params = self._sql_where(
             "SELECT date, currency, value FROM CURSBNR", date=date, currency=currency
@@ -250,7 +257,7 @@ class CursDB:
             sql += "\nORDER BY\n    " + ",".join(orderby)
 
         # print(sql, params)
-        return self._exec_fetchall(sql, params)
+        return self._exec_fetchall_rows(sql, params, type=ValueRow)
 
     def has_no_value(self, date: _DateT, currency: str) -> bool:
         date = to_date(date)
@@ -296,7 +303,7 @@ class CursDB:
             "SELECT date, currency FROM CURSBNR_NO_VALUE", date=date, currency=currency
         )
 
-        return self._exec_fetchall(sql, params)
+        return self._exec_fetchall_rows(sql, params, type=NoValueRow)
 
     # ---------
 
@@ -325,12 +332,42 @@ class CursDB:
 
     # ---------
 
-    def _exec_fetchall(self, sql: str, params: list = []) -> list:
+    def _exec_fetchall_rows(
+        self,
+        sql: str,
+        params: list = [],
+        *,
+        type: Type[_NamedTuple_T],
+    ) -> list[_T]:
         cursor = self._conn.execute(sql, params)
         try:
-            return cursor.fetchall()
+            return list(starmap(type, cursor))
         finally:
             cursor.close()
+
+    def _exec_fetchall_apply(
+        self,
+        sql: str,
+        params: list = [],
+        *,
+        func: Callable[[Any], _T],
+    ) -> list[_T]:
+        cursor = self._conn.execute(sql, params)
+        try:
+            return list(map(func, cursor))
+        finally:
+            cursor.close()
+
+    def _exec_fetch_column(
+        self,
+        sql: str,
+        params: list = [],
+        *,
+        value: Type[_T] | Callable[[Any], _T] = lambda value: value,
+        column: int | str = 0,
+    ) -> list[_T]:
+
+        return self._exec_fetchall_apply(sql, params, func=lambda row: value(row[column]))
 
     def _exec(self, sql: str, params: list = []) -> None:
         self._conn.execute(sql, params).close()

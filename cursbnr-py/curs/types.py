@@ -1,6 +1,8 @@
 import datetime as dt
 from typing import Any, Iterable, List, Tuple, Type, TypeVar
 
+from typing import NamedTuple
+
 _DateT = str | dt.date | dt.datetime
 _NumT = str | int | float
 
@@ -8,6 +10,9 @@ Date = dt.date
 Numeric = int | float
 DateTime = dt.datetime
 
+ValueRow = NamedTuple("ValueRow", date=Date, currency=str, value=Numeric)
+OptValueRow = NamedTuple("OptValueRow",date=Date, currency=str, value=Numeric|None)
+NoValueRow = NamedTuple("NoValueRow", date=Date, currency=str)
 
 def to_date_opt(date: _DateT | None) -> Date | None:
     if date is None or date == "":
@@ -63,7 +68,7 @@ def to_datetime(date: _DateT) -> DateTime:
 
 
 def extract_dates_values(
-    rows: Iterable[Tuple[Date, str, Numeric]], /, *, currency: str
+    rows: Iterable[OptValueRow], /, *, currency: str
 ) -> Tuple[List[Date], List[Numeric]]:
 
     if currency is not None:
@@ -71,13 +76,12 @@ def extract_dates_values(
 
     rows = map(lambda dcv: (dcv[0], dcv[2]), rows)
 
-    (*dates_values,) = zip(*rows)
-    if not len(dates_values):
-        return list(), list()
+    dates, values = list(), list()
+    for date, value in rows:
+        dates.append(date)
+        values.append(value)
 
-    dates, values = dates_values
-    return list(dates), list(values)
-
+    return dates, values
 
 class CursMap(dict):
     def __init__(self):
