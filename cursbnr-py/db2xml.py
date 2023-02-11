@@ -12,11 +12,8 @@ db = CursDB(Path(__file__).parent / "bnr.db", mode="ro")
 
 print("Retrieving items...")
 map = CursMap()
-for date, currency, value in db.select_rows():
+for date, currency, value in db.select_rows(value_is_null=None):
     map.put_value(date, currency, value)
-
-for date, currency, in db.select_no_value_rows():
-    map.put_value(date, currency, None)
 
 print(f"Retrieved {map.get_size()} items.\nWriting XML file...")
 

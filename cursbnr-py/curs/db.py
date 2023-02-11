@@ -1,24 +1,30 @@
+import datetime as dt
+import re
+import sqlite3
+from datetime import date as _date
+from datetime import datetime
+from datetime import time as _time
 from functools import partial
 from itertools import starmap
-import sqlite3
-from datetime import datetime, date as _date, time as _time
+from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, NamedTuple, Type, TypeVar
-import datetime as dt
+
+from textwrap import dedent
 
 from curs.types import (
-    _DateT,
-    _NumT,
-    to_date,
-    to_date_opt,
     Date,
     Numeric,
-    to_numeric,
+    DateCurrencyRow,
+    DateCurrencyValueRow,
+    DateCurrencyOptValueRow,
+    _DateT,
+    _NumT,
     require_str,
-    ValueRow,
-    NoValueRow,
+    to_date,
+    to_date_opt,
+    to_numeric,
+    to_numeric_opt,
 )
-
-from pathlib import Path
 
 _OptValueRowT = tuple[_DateT, str, _NumT | None]
 _ValueRowT = tuple[_DateT, str, _NumT]
@@ -58,20 +64,14 @@ class CursDB:
             detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
         )
 
-        if not self._has_table("CURSBNR") and not self._read_only:
-            self._create_main_table()
+        if not self._read_only:
+            if not self._has_table("CURSBNR"):
+                self._create_main_table()
 
-        if not self._has_table("CURSBNR_NO_VALUE") and not self._read_only:
-            self._create_no_value_table()
+            self._make_value_null()
 
-    def _has_table(self, tablename: str):
-        return (
-            self._exec_fetchone(
-                "SELECT COUNT(*)\nFROM sqlite_schema\nWHERE name == ?",
-                (tablename,),
-            )[0]
-            > 0
-        )
+            if self._has_table("CURSBNR_NO_VALUE"):
+                self._merge_no_value_table()
 
     @property
     def connection(self) -> sqlite3.Connection:
@@ -94,12 +94,16 @@ class CursDB:
         self._conn.rollback()
 
     def get_currencies(self) -> list[str]:
-        return self._exec_fetch_column("SELECT currency FROM CURSBNR GROUP BY currency", value=str)
+        return self._exec_fetch_column(
+            "SELECT currency FROM CURSBNR GROUP BY currency", value=str
+        )
 
     def get_date_range(self, currency=None) -> tuple[Date | None, Date | None]:
 
         sql, params = self._sql_where(
-            "SELECT MIN(date), MAX(date) FROM CURSBNR", currency=currency
+            "SELECT MIN(date), MAX(date) FROM CURSBNR",
+            currency=currency,
+            value_is_null=False,
         )
 
         mind, maxd = self._exec_fetchone(sql, params)
@@ -114,36 +118,19 @@ class CursDB:
         if not self.in_transaction:
             self.begin()
 
-        if value is not None:
-            self.insert_value(date, currency, value, replace=True)
-            self.unset_no_value(date, currency)
-        else:
-            self.set_no_value(date, currency)
-            self.remove_rows(date, currency)
+        self.insert_value(date, currency, value, replace=True)
 
     def put_rows(self, rows: Iterable[_OptValueRowT]) -> None:
         value_rows: list[_ValueRowT] = []
         no_value_rows: list[_NoValueRowT] = []
 
-        for date, currency, value in rows:
-            if value is not None:
-                value_rows.append((date, currency, value))
-            else:
-                no_value_rows.append((date, currency))
-
-        if not self.in_transaction:
-            self.begin()
-
         self.insert_many_values(value_rows, replace=True)
-        self.unset_many_no_values(value_rows)
-        self.set_many_no_values(no_value_rows)
-        self.delete_many_values(no_value_rows)
 
     def insert_many_values(
-        self, rows: Iterable[_ValueRowT], *, replace: bool | None = None
+        self, rows: Iterable[_OptValueRowT], *, replace: bool | None = None
     ) -> None:
         value_rows = (
-            (to_date(date), require_str(currency), to_numeric(value))
+            (to_date(date), require_str(currency), to_numeric_opt(value))
             for date, currency, value in rows
         )
         return self._exec_many(
@@ -153,7 +140,12 @@ class CursDB:
             value_rows,
         )
 
-    def delete_many_values(self, rows: Iterable[_OptOrNoValueRowT]) -> None:
+    def delete_many_values(
+        self, rows: Iterable[_OptOrNoValueRowT], *, are_you_sure: bool
+    ) -> None:
+        if not are_you_sure:  # <(°.°)>
+            return
+
         no_value_rows = (
             (to_date(date), require_str(currency)) for date, currency, *_ in rows
         )
@@ -161,35 +153,17 @@ class CursDB:
             "DELETE FROM CURSBNR WHERE date = ? AND currency = ?", no_value_rows
         )
 
-    def unset_many_no_values(self, rows: Iterable[_OptOrNoValueRowT]) -> None:
-        no_value_rows = (
-            (to_date(date), require_str(currency)) for date, currency, *_ in rows
-        )
-        return self._exec_many(
-            "DELETE FROM CURSBNR_NO_VALUE WHERE date = ? AND currency = ?",
-            no_value_rows,
-        )
-
-    def set_many_no_values(self, rows: Iterable[_OptOrNoValueRowT]):
-        no_value_rows = (
-            (to_date(date), require_str(currency)) for date, currency, *_ in rows
-        )
-        return self._exec_many(
-            "INSERT OR IGNORE INTO CURSBNR_NO_VALUE (date, currency) VALUES (?, ?)",
-            no_value_rows,
-        )
-
     def insert_value(
         self,
         date: _DateT,
         currency: str,
-        value: _NumT,
+        value: _NumT | None,
         *,
         replace: bool | None = None,
     ):
         date = to_date(date)
         require_str(currency)
-        value = to_numeric(value)
+        value = to_numeric_opt(value)
         self._exec(
             "INSERT "
             + self._sql_or_action(replace=replace)
@@ -197,21 +171,44 @@ class CursDB:
             (date, currency, value),
         )
 
-    def get_value(self, date: _DateT, currency: str) -> Numeric | None:
+    def value(self, date: _DateT, currency: str) -> Numeric | None:
         date = to_date(date)
         require_str(currency)
         result = self._exec_fetchone(
-            "SELECT value FROM CURSBNR WHERE date=? AND CURRENCY=?",
+            """
+            SELECT value FROM CURSBNR WHERE date <= ? AND currency == ?
+            ORDER BY date DESC
+            LIMIT 1
+            """,
+            
             [date, currency],
         )
         if result is not None:
             return result[0]
 
+    def get_value(self, date: _DateT, currency: str) -> DateCurrencyValueRow | None:
+        date = to_date(date)
+        require_str(currency)
+        result = self._exec_fetchone(
+            """
+            SELECT date, currency, value FROM CURSBNR WHERE date<=? AND currency=? 
+            ORDER BY date DESC
+            """,
+            [date, currency],
+        )
+        if result is not None:
+            return DateCurrencyValueRow(*result)
+
     def remove_rows(
         self,
         date: _DateT | tuple[_DateT, _DateT] | None = None,
         currency: str | list[str] | None = None,
+        *,
+        are_you_sure: bool,
     ):
+        if not are_you_sure:  # <(°.°)>
+            return
+
         sql, params = self._sql_where(
             "DELETE FROM CURSBNR", date=date, currency=currency
         )
@@ -232,80 +229,68 @@ class CursDB:
         date: _DateT | tuple[_DateT, _DateT] | None = None,
         currency: str | list[str] | None = None,
         orderby: str | None = None,
-    ) -> list[ValueRow]:
+        value_is_null: bool,  # = None
+    ) -> list[DateCurrencyOptValueRow] | list[DateCurrencyValueRow]:
 
         sql, params = self._sql_where(
-            "SELECT date, currency, value FROM CURSBNR", date=date, currency=currency
+            "SELECT date, currency, value FROM CURSBNR",
+            date=date,
+            currency=currency,
+            value_is_null=value_is_null,
         )
 
-        def map_order(order):
-            return {
-                "currency": "currency",
-                "date": "date",
-                "currency:desc": "currency DESC",
-                "date:desc": "date DESC",
-                "currency:asc": "currency ASC",
-                "date:asc": "date ASC",
-            }[order]
+        sql += self._sql_order_by(orderby)
 
-        if orderby is not None:
-            if isinstance(orderby, str):
-                orderby = orderby.split(",")
-            orderby = list(map(map_order, orderby))
+        row_type = DateCurrencyValueRow if value_is_null == False else DateCurrencyOptValueRow
 
-        if orderby:
-            sql += "\nORDER BY\n    " + ",".join(orderby)
+        return self._exec_fetchall_rows(sql, params, type=row_type)
 
-        # print(sql, params)
-        return self._exec_fetchall_rows(sql, params, type=ValueRow)
-
-    def has_no_value(self, date: _DateT, currency: str) -> bool:
-        date = to_date(date)
-        require_str(currency)
-        result = self._exec_fetchone(
-            "SELECT COUNT(*) FROM CURSBNR_NO_VALUE WHERE date=? AND CURRENCY=?",
-            [date, currency],
-        )
-        return bool(result[0])
-
-    def set_no_value(
-        self,
-        date: _DateT,
-        currency: str,
-    ):
-        date = to_date(date)
-        require_str(currency)
-
-        self._exec(
-            "INSERT OR IGNORE INTO CURSBNR_NO_VALUE (date, currency) VALUES (?, ?)",
-            (date, currency),
-        )
-
-    def unset_no_value(
-        self,
-        date: _DateT | tuple[_DateT, _DateT] | None = None,
-        currency: str | list[str] | None = None,
-    ):
-        sql, params = self._sql_where(
-            "DELETE FROM CURSBNR_NO_VALUE", date=date, currency=currency
-        )
-
-        self._exec(sql, params)
-
-    def select_no_value_rows(
+    def select_value_rows(
         self,
         *,
         date: _DateT | tuple[_DateT, _DateT] | None = None,
         currency: str | list[str] | None = None,
         orderby: str | None = None,
-    ) -> list[tuple[Date, str]]:
+    ) -> list[DateCurrencyValueRow]:
+
         sql, params = self._sql_where(
-            "SELECT date, currency FROM CURSBNR_NO_VALUE", date=date, currency=currency
+            "SELECT date, currency, value FROM CURSBNR",
+            date=date,
+            currency=currency,
+            value_is_null=False,
         )
 
-        return self._exec_fetchall_rows(sql, params, type=NoValueRow)
+        sql += self._sql_order_by(orderby)
+
+        return self._exec_fetchall_rows(sql, params, type=DateCurrencyValueRow)
+
+    def select_date_currency_rows(
+        self,
+        *,
+        date: _DateT | tuple[_DateT, _DateT] | None = None,
+        currency: str | list[str] | None = None,
+        orderby: str | None = None,
+        value_is_null: bool = None,
+    ) -> list[tuple[Date, str]]:
+        sql, params = self._sql_where(
+            "SELECT date, currency FROM CURSBNR",
+            date=date,
+            currency=currency,
+            value_is_null=value_is_null,
+        )
+
+        return self._exec_fetchall_rows(sql, params, type=DateCurrencyRow)
 
     # ---------
+
+    def _has_table(self, tablename: str):
+        return (
+            self._exec_fetchone(
+                "SELECT COUNT(*)\nFROM sqlite_schema\nWHERE name == ?",
+                (tablename,),
+            )[0]
+            > 0
+        )
 
     def _create_main_table(self):
         self._exec(
@@ -313,22 +298,37 @@ class CursDB:
             CREATE TABLE CURSBNR(
                 date DATE NOT NULL,
                 currency TEXT NOT NULL,
-                value NUMERIC NOT NULL,
+                value NUMERIC NULL,
                 PRIMARY KEY (date, currency)
             ) WITHOUT ROWID
             """
         )
 
-    def _create_no_value_table(self):
+    def _make_value_null(self):
+        sql = self._exec_fetchone(
+            "SELECT sql FROM sqlite_schema WHERE name == ?",
+            ("CURSBNR",),
+        )[0]
+
+        if re.match(r"(?sxi) .* value \s+ NUMERIC \s+ NOT \s+ NULL \s* ,", sql):
+            self._exec("ALTER TABLE CURSBNR RENAME TO _CURSBNR_VALUE")
+            self._create_main_table()
+            self._exec(
+                """
+                INSERT INTO CURSBNR (date, currency, value)
+                SELECT date, currency, value FROM _CURSBNR_VALUE
+                """
+            )
+            self._exec("DROP TABLE _CURSBNR_VALUE")
+
+    def _merge_no_value_table(self):
         self._exec(
             """
-            CREATE TABLE CURSBNR_NO_VALUE(
-                date DATE NOT NULL,
-                currency TEXT NOT NULL,
-                PRIMARY KEY (date, currency)
-            ) WITHOUT ROWID
+            INSERT INTO CURSBNR (date, currency)
+            SELECT date, currency FROM CURSBNR_NO_VALUE
             """
         )
+        self._exec("DROP TABLE CURSBNR_NO_VALUE")
 
     # ---------
 
@@ -339,7 +339,7 @@ class CursDB:
         *,
         type: Type[_NamedTuple_T],
     ) -> list[_T]:
-        cursor = self._conn.execute(sql, params)
+        cursor = self._conn.execute(dedent(sql), params)
         try:
             return list(starmap(type, cursor))
         finally:
@@ -352,7 +352,7 @@ class CursDB:
         *,
         func: Callable[[Any], _T],
     ) -> list[_T]:
-        cursor = self._conn.execute(sql, params)
+        cursor = self._conn.execute(dedent(sql), params)
         try:
             return list(map(func, cursor))
         finally:
@@ -367,20 +367,22 @@ class CursDB:
         column: int | str = 0,
     ) -> list[_T]:
 
-        return self._exec_fetchall_apply(sql, params, func=lambda row: value(row[column]))
+        return self._exec_fetchall_apply(
+            sql, params, func=lambda row: value(row[column])
+        )
 
     def _exec(self, sql: str, params: list = []) -> None:
-        self._conn.execute(sql, params).close()
+        self._conn.execute(dedent(sql), params).close()
 
     def _exec_fetchone(self, sql: str, params: list = []) -> Any:
-        cursor = self._conn.execute(sql, params)
+        cursor = self._conn.execute(dedent(sql), params)
         try:
             return cursor.fetchone()
         finally:
             cursor.close()
 
     def _exec_many(self, sql: str, param_rows: Iterable[list]) -> None:
-        self._conn.executemany(sql, param_rows).close()
+        self._conn.executemany(dedent(sql), param_rows).close()
 
     @staticmethod
     def _sql_or_action(*, replace: bool | None = None):
@@ -391,12 +393,19 @@ class CursDB:
         sql: str,
         params: list = [],
         *,
+        value_is_null: bool | None,
         date: _DateT | tuple[_DateT, _DateT] | None = None,
         currency: str | list[str] | None = None,
     ) -> tuple[str, list]:
         params = list(params)
         sep = "\nWHERE "
         _AND_ = " AND "
+
+        if value_is_null is not None:
+            sql += (
+                sep + "value" + {False: " IS NOT NULL", True: " IS NULL"}[value_is_null]
+            )
+            sep = _AND_
 
         if date is None:
             pass
@@ -434,3 +443,25 @@ class CursDB:
             sep = _AND_
 
         return sql, params
+
+    @staticmethod
+    def _sql_order_by(orderby: None | str | list[str]):
+        def map_order(order):
+            return {
+                "currency": "currency",
+                "date": "date",
+                "currency:desc": "currency DESC",
+                "date:desc": "date DESC",
+                "currency:asc": "currency ASC",
+                "date:asc": "date ASC",
+            }[order]
+
+        if orderby is not None:
+            if isinstance(orderby, str):
+                orderby = orderby.split(",")
+            orderby = list(map(map_order, orderby))
+
+        if orderby:
+            return "\nORDER BY\n    " + ",".join(orderby)
+        else:
+            return ""

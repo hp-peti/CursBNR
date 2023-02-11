@@ -220,7 +220,7 @@ class CursWindow(QtWidgets.QMainWindow):
         if self._keep_ckb.isChecked():
             currencies.update(self._past_currencies)
 
-        rows = self._db.select_rows(
+        rows = self._db.select_value_rows(
             date=(from_date, to_date), currency=list(currencies)
         )
         colors = self._generate_colors(len(currencies))

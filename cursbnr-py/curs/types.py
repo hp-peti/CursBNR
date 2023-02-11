@@ -10,9 +10,9 @@ Date = dt.date
 Numeric = int | float
 DateTime = dt.datetime
 
-ValueRow = NamedTuple("ValueRow", date=Date, currency=str, value=Numeric)
-OptValueRow = NamedTuple("OptValueRow",date=Date, currency=str, value=Numeric|None)
-NoValueRow = NamedTuple("NoValueRow", date=Date, currency=str)
+DateCurrencyRow = NamedTuple("DateCurrencyRow", date=Date, currency=str)
+DateCurrencyValueRow = NamedTuple("DateCurrencyValueRow", date=Date, currency=str, value=Numeric)
+DateCurrencyOptValueRow = NamedTuple("DateCurrencyOptValueRow",date=Date, currency=str, value=Numeric|None)
 
 def to_date_opt(date: _DateT | None) -> Date | None:
     if date is None or date == "":
@@ -68,7 +68,7 @@ def to_datetime(date: _DateT) -> DateTime:
 
 
 def extract_dates_values(
-    rows: Iterable[OptValueRow], /, *, currency: str
+    rows: Iterable[DateCurrencyOptValueRow], /, *, currency: str
 ) -> Tuple[List[Date], List[Numeric]]:
 
     if currency is not None:
