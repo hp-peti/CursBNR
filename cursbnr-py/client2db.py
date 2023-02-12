@@ -15,7 +15,7 @@ import threading
 # %%
 from curs.db import CursDB
 from curs.client import CursClient
-from curs.types import CursMap, to_date, Date, Numeric
+from curs.types import CursMap, to_date, Date, Numeric, DateCurrencyOptValueRow
 
 from pathlib import Path
 
@@ -102,8 +102,7 @@ print(" ".join(all_currencies))
 xcache = set()
 
 for date, currency in db.select_date_currency_rows(
-    currency=all_currencies,
-    value_is_null=None
+    currency=all_currencies, value_is_null=None
 ):
     xcache.add((date, currency))
 
@@ -128,10 +127,14 @@ try:
             db.commit()
             inserted = 0
 
-    def fetch(date, currency) -> Tuple[Date, str, Numeric | None]:
+    def fetch(date, currency) -> DateCurrencyOptValueRow | None:
         try:
             loop.set_postfix_str(f"{date} {currency}")
             r_date, r_currency, r_value = get_client().get_value(date, currency)
+            if r_date != date:
+                return DateCurrencyOptValueRow(date, currency, None)
+            else:
+                return DateCurrencyOptValueRow(r_date, r_currency, r_value)
         except WebFault as wf:
             with thread_lock:
                 tqdm.write(f"{wf!s} @{date} {currency})")
@@ -142,11 +145,6 @@ try:
                     ):
                         tqdm.write(f"Skipping {currency} before {date}")
                         exclude_currency.append(currency)
-
-        if r_date != date:
-            return (date, currency, None)
-        else:
-            return (r_date, r_currency, r_value)
 
     exclude_currency = []
     for date in loop:
@@ -161,7 +159,7 @@ try:
 
             for currency in currencies:
                 if (date, currency) in xcache:
-                    #xcache.remove((date, currency))
+                    # xcache.remove((date, currency))
                     continue  # inner loop
 
                 if currency in before_first_valid_date:
@@ -180,7 +178,10 @@ try:
             def get_result(f: Future):
                 return f.result()
 
-            results = list(map(get_result, futures))
+            def is_not_None(r) -> bool:
+                return r is not None
+
+            results = list(filter(is_not_None, map(get_result, futures)))
             futures.clear()
             db.put_rows(results)
             after_insert(len(results))

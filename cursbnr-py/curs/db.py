@@ -177,7 +177,6 @@ class CursDB:
             ORDER BY date DESC
             LIMIT 1
             """,
-            
             [date, currency],
         )
         if result is not None:
@@ -201,13 +200,17 @@ class CursDB:
         date: _DateT | tuple[_DateT, _DateT] | None = None,
         currency: str | list[str] | None = None,
         *,
+        value_is_null: bool = None,
         are_you_sure: bool,
     ):
         if not are_you_sure:  # <(°.°)>
             return
 
         sql, params = self._sql_where(
-            "DELETE FROM CURSBNR", date=date, currency=currency
+            "DELETE FROM CURSBNR",
+            date=date,
+            currency=currency,
+            value_is_null=value_is_null,
         )
 
         self._exec(sql, params)
@@ -238,7 +241,9 @@ class CursDB:
 
         sql += self._sql_order_by(orderby)
 
-        row_type = DateCurrencyValueRow if value_is_null == False else DateCurrencyOptValueRow
+        row_type = (
+            DateCurrencyValueRow if value_is_null == False else DateCurrencyOptValueRow
+        )
 
         return self._exec_fetchall_rows(sql, params, type=row_type)
 
