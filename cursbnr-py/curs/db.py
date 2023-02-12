@@ -121,10 +121,7 @@ class CursDB:
         self.insert_value(date, currency, value, replace=True)
 
     def put_rows(self, rows: Iterable[_OptValueRowT]) -> None:
-        value_rows: list[_ValueRowT] = []
-        no_value_rows: list[_NoValueRowT] = []
-
-        self.insert_many_values(value_rows, replace=True)
+        self.insert_many_values(rows, replace=True)
 
     def insert_many_values(
         self, rows: Iterable[_OptValueRowT], *, replace: bool | None = None
