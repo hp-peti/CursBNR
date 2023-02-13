@@ -19,13 +19,47 @@ from curs.types import CursMap, to_date, Date, Numeric, DateCurrencyOptValueRow
 
 from pathlib import Path
 
+from argparse import ArgumentParser
+from sys import argv
+
+arg_parser = ArgumentParser()
+
+arg_parser.add_argument(
+    "--db", metavar="DB", type=str, help="target database", default=None
+)
+arg_parser.add_argument(
+    "--start-date",
+    metavar="YYYY-MM-DD",
+    type=to_date,
+    help="earliest date to retrieve",
+    default=None,
+)
+arg_parser.add_argument(
+    "--end-date",
+    metavar="YYYY-MM-DD",
+    type=to_date,
+    help="latest date to retrieve",
+    default=None,
+)
+args = arg_parser.parse_args(argv[1:])
+db_file = Path(args.db)
+
+if args.db is None:
+    db_file = Path(__file__).parent / "bnr.db"
+else:
+    db_file = Path(args.db)
+    if not db_file.parent.exists() or not db_file.parent.is_dir():
+        raise AssertionError(f"invalid db file path {db_file!s}")
+
+
 # import logging
 # logging.basicConfig(level='DEBUG')
 
 start_date = "1998-01-01"
-# start_date = "2023-01-01"
-db_name = "bnr.db"
-# db_name = ".tmp.db"
+if args.start_date is not None:
+    start_date = args.start_date
+if args.end_date is not None:
+    end_date = args.end_date
 
 commit_every_n = 1024
 before_first_valid_date = {
@@ -71,7 +105,7 @@ autoexclude = True
 
 # %%
 
-db = CursDB(Path(__file__).parent / db_name)
+db = CursDB(db_file)
 
 # %%
 
@@ -111,7 +145,12 @@ tpx = ThreadPoolExecutor(len(currencies) + len(last_valid_date))
 
 # %%
 days = list(
-    map(lambda d: d.date(), rrule(DAILY, to_date(start_date), until=client.lastdate))
+    map(
+        lambda d: d.date(),
+        rrule(
+            DAILY, to_date(start_date), until=min(client.lastdate, to_date(end_date))
+        ),
+    )
 )
 days.reverse()
 loop = tqdm(days, leave=False)
