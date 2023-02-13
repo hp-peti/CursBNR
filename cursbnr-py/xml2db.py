@@ -32,7 +32,7 @@ db = CursDB(db_file)
 
 # %%
 print("Parsing XML...")
-map = parse_bnr_xml("bnr.xml")
+map = parse_bnr_xml(xml_file)
 
 print(f"Read {map.get_size()} items.")
 
