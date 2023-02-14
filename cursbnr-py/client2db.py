@@ -42,7 +42,6 @@ arg_parser.add_argument(
     default=None,
 )
 args = arg_parser.parse_args(argv[1:])
-db_file = Path(args.db)
 
 if args.db is None:
     db_file = Path(__file__).parent / "bnr.db"
@@ -144,12 +143,13 @@ tpx = ThreadPoolExecutor(len(currencies) + len(last_valid_date))
 
 
 # %%
+
+end_date=client.lastdate if args.end_date is None else min(client.lastdate, to_date(args.end_date))
+
 days = list(
     map(
         lambda d: d.date(),
-        rrule(
-            DAILY, to_date(start_date), until=min(client.lastdate, to_date(end_date))
-        ),
+        rrule(DAILY, to_date(start_date), until=end_date),
     )
 )
 days.reverse()
