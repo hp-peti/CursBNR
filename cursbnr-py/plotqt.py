@@ -2,7 +2,7 @@
 
 import sys
 from pathlib import Path
-from typing import Any, List, Mapping, Sequence
+from typing import Any, Mapping, Sequence
 
 import matplotlib
 from dateutil.relativedelta import relativedelta
@@ -12,7 +12,7 @@ matplotlib.use("Qt5Agg")
 
 import numpy as np
 from curs.db import CursDB
-from curs.types import Date, extract_dates_values, to_date_opt
+from curs.types import Date, extract_dates_values, to_date_opt, to_date
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
@@ -51,7 +51,8 @@ class MplCanvas(FigureCanvasQTAgg):
     def _add_plot_data(_plot_data, /, currency: str, *, x, y, color=None):
         _plot_data[currency] = {"x": x, "y": y, "color": color}
 
-    if False: # due to navigation toolbar
+    if False:  # due to navigation toolbar
+
         def _resize_figure(self, oldsize, newsize):
             if oldsize == newsize:
                 return
@@ -73,9 +74,9 @@ class MplCanvas(FigureCanvasQTAgg):
 
         fig.clear()
         axes = fig.add_subplot(111)
-        axes.locator_params(axis='x', tight=True, nbins=64)
-        axes.locator_params(axis='y', tight=True, nbins=48)
-        axes.tick_params(labelsize='small')
+        axes.locator_params(axis="x", tight=True, nbins=64)
+        axes.locator_params(axis="y", tight=True, nbins=48)
+        axes.tick_params(labelsize="small")
 
         def n_days(x: Sequence[Date]):
             if not len(x):
@@ -86,20 +87,30 @@ class MplCanvas(FigureCanvasQTAgg):
 
         match n_max_days:
             case n if n <= 30:
-                marker = "8"
+                marker = "o"
+                markersize = 8
             case n if n < 90:
                 marker = "o"
+                markersize = 4
             case n if n <= 180:
-                marker = "."
+                marker = "o"
+                markersize = 2
             case _:
                 marker = None
+                markersize = None
 
         for label, data in self._plot_data.items():
             x = data["x"]
             y = data["y"]
 
-
-            axes.plot(x, y, label=label, marker=marker, color=data["color"])
+            axes.plot(
+                x,
+                y,
+                label=label,
+                marker=marker,
+                color=data["color"],
+                markersize=markersize,
+            )
 
         fig.autofmt_xdate(rotation=45)
         fig.set_tight_layout(True)
@@ -107,7 +118,8 @@ class MplCanvas(FigureCanvasQTAgg):
         axes.set_ylabel("RON")
         axes.legend()
 
-    if False: # due to navigation toolbar
+    if False:  # due to navigation toolbar
+
         def resizeEvent(self, event):
             self._resize_figure(event.oldSize(), event.size())
             return super().resizeEvent(event)
@@ -117,15 +129,19 @@ class CursWindow(QtWidgets.QMainWindow):
     def __init__(self, *args, **kwargs):
         self._db = kwargs.pop("db")
         date_from, date_to = map(to_date_opt, kwargs.pop("date_range", (None, None)))
-        currencies = kwargs.pop("currencies")
-        assert isinstance(currencies, list) and all(
-            map(lambda s: isinstance(s, str), currencies)
-        )
+        currency = kwargs.pop("currency", "EUR")
+
         self._past_currencies = set()
 
         super(CursWindow, self).__init__(*args, **kwargs)
 
-        self._initUI(date_from, date_to, currencies)
+        self._initUI(
+            date_from=date_from,
+            date_to=date_to,
+            currency=currency,
+            date_range=db.get_date_range(),
+            currencies=db.get_currencies(),
+        )
 
         self._replot_xy()
 
@@ -134,7 +150,13 @@ class CursWindow(QtWidgets.QMainWindow):
         return cm.rainbow(np.linspace(0, 1, length)) * np.array([0.75, 0.75, 0.75, 1])
 
     def _initUI(
-        self, date_from: Date | None, date_to: Date | None, currencies: List[str]
+        self,
+        *,
+        date_from: Date | None,
+        date_to: Date | None,
+        currency: str,
+        date_range: tuple[Date, Date],
+        currencies: list[str],
     ):
 
         # Create the maptlotlib FigureCanvas object,
@@ -145,7 +167,7 @@ class CursWindow(QtWidgets.QMainWindow):
 
         self._currency_cb = QComboBox()
         self._currency_cb.addItems(currencies)
-        self._currency_cb.setCurrentText("EUR")
+        self._currency_cb.setCurrentText(currency if currency in currencies else "EUR")
 
         top_row.addWidget(self._currency_cb)
 
@@ -196,23 +218,34 @@ class CursWindow(QtWidgets.QMainWindow):
         self.setWindowTitle("CursDB plotter")
         self.setCentralWidget(center)
 
-        self._set_minmax_date(date_from, date_to)
+        self._set_minmax_date(date_range, init=(date_from, date_to))
+
+        date_range[0]
 
         self.show()
 
-    def _set_minmax_date(self, date_from, date_to) -> None:
-        if date_from is not None:
+    def _set_minmax_date(
+        self,
+        date_range: tuple[Date | None, Date | None],
+        *,
+        init: tuple[Date | None, Date | None] | None = None,
+    ) -> None:
+        date_from, date_to = date_range
+        if date_range is not None:
             self._date_from_edit.setMinimumDate(date_from)
             self._date_to_edit.setMinimumDate(date_from)
-            self._date_from_edit.setDate(date_from)
         if date_to is not None:
             self._date_from_edit.setMaximumDate(date_to)
             self._date_to_edit.setMaximumDate(date_to)
-            self._date_to_edit.setDate(date_to)
+
+        if init is not None:
+            i_from, i_to = init
+            self._date_from_edit.setDate(i_from if i_from is not None else date_from)
+            self._date_to_edit.setDate(i_to if i_to is not None else date_to)
 
     def _replot_xy(self):
-        from_date = self._date_from_edit.date().toPyDate()
-        to_date = self._date_to_edit.date().toPyDate()
+        date_from = self._date_from_edit.date().toPyDate()
+        date_to = self._date_to_edit.date().toPyDate()
         currency = self._currency_cb.currentText()
         n = self._currency_cb.currentIndex()
         keep = self._keep_ckb.checkState()
@@ -221,7 +254,7 @@ class CursWindow(QtWidgets.QMainWindow):
             currencies.update(self._past_currencies)
 
         rows = self._db.select_value_rows(
-            date=(from_date, to_date), currency=list(currencies)
+            date=(date_from, date_to), currency=list(currencies)
         )
         colors = self._generate_colors(len(currencies))
 
@@ -234,14 +267,58 @@ class CursWindow(QtWidgets.QMainWindow):
 
         self._plot.set_plot_data(data)
         self._past_currencies = currencies
+        self._set_minmax_date(db.get_date_range())
 
 
-db = CursDB(Path(__file__).parents[0] / "bnr.db", mode="ro")
-go_back = relativedelta(years=3, months=0, days=0)
+from argparse import ArgumentParser
+from sys import argv
 
-from_date, to_date = db.get_date_range()
-currencies = db.get_currencies()
+arg_parser = ArgumentParser()
+
+arg_parser.add_argument(
+    "--db", metavar="DB", type=str, help="target database", default=None
+)
+arg_parser.add_argument(
+    "--start-date",
+    metavar="YYYY-MM-DD",
+    type=to_date,
+    help="earliest date to show",
+    default=None,
+)
+arg_parser.add_argument(
+    "--end-date",
+    metavar="YYYY-MM-DD",
+    type=to_date,
+    help="latest date to show",
+    default=None,
+)
+
+arg_parser.add_argument(
+    "--currency",
+    metavar="CUR",
+    type=str,
+    default=None,
+)
+
+args = arg_parser.parse_args(argv[1:])
+
+if args.db is None:
+    db_file = Path(__file__).parent / "bnr.db"
+else:
+    db_file = Path(args.db)
+db = CursDB(db_file, mode="ro")
+
+go_back = relativedelta(years=0, months=0, days=15)
+
+
+if args.start_date is None and args.end_date is None:
+    args.end_date = today()
+    args.start_date = today() - go_back
+
+pp = {}
+if args.currency is not None:
+    pp["currency"] = args.currency
 
 app = QtWidgets.QApplication(sys.argv)
-w = CursWindow(db=db, date_range=(from_date, to_date), currencies=currencies)
+w = CursWindow(db=db, date_range=(args.start_date, args.end_date), **pp)
 app.exec_()
