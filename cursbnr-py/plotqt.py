@@ -75,8 +75,8 @@ class MplCanvas(FigureCanvasQTAgg):
         fig.clear()
         axes = fig.add_subplot(111)
         axes.locator_params(axis="x", tight=True, nbins=64)
-        axes.locator_params(axis="y", tight=True, nbins=48)
-        axes.tick_params(labelsize="small")
+        axes.locator_params(axis="y", tight=True, nbins=36)
+        axes.tick_params(labelsize=6)
 
         def n_days(x: Sequence[Date]):
             if not len(x):
