@@ -11,3 +11,4 @@ cursbnr-py/*.db-journal
 cursbnr-py/*.xml
 
 .vscode/
+.DS_Store
