@@ -31,6 +31,61 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
+from argparse import ArgumentParser
+from sys import argv
+
+
+def main():
+    arg_parser = ArgumentParser()
+
+    arg_parser.add_argument(
+        "--db", metavar="DB", type=str, help="target database", default=None
+    )
+    arg_parser.add_argument(
+        "--start-date",
+        metavar="YYYY-MM-DD",
+        type=to_date,
+        help="earliest date to show",
+        default=None,
+    )
+    arg_parser.add_argument(
+        "--end-date",
+        metavar="YYYY-MM-DD",
+        type=to_date,
+        help="latest date to show",
+        default=None,
+    )
+
+    arg_parser.add_argument(
+        "--currency",
+        metavar="CUR",
+        type=str,
+        default=None,
+    )
+
+    args = arg_parser.parse_args(argv[1:])
+
+    if args.db is None:
+        db_file = Path(__file__).parent / "bnr.db"
+    else:
+        db_file = Path(args.db)
+
+    db = CursDB(db_file, mode="ro")
+
+    go_back = relativedelta(years=0, months=0, days=15)
+
+    if args.start_date is None and args.end_date is None:
+        args.end_date = today()
+        args.start_date = today() - go_back
+
+    pp = {}
+    if args.currency is not None:
+        pp["currency"] = args.currency
+
+    app = QtWidgets.QApplication(sys.argv)
+    w = CursWindow(db=db, date_range=(args.start_date, args.end_date), **pp)
+    app.exec_()
+
 
 class MplCanvas(FigureCanvasQTAgg):
     def __init__(self, parent=None, dpi=100):
@@ -128,6 +183,7 @@ class MplCanvas(FigureCanvasQTAgg):
 class CursWindow(QtWidgets.QMainWindow):
     def __init__(self, *args, **kwargs):
         self._db = kwargs.pop("db")
+        db = self._db
         date_from, date_to = map(to_date_opt, kwargs.pop("date_range", (None, None)))
         currency = kwargs.pop("currency", "EUR")
 
@@ -167,6 +223,15 @@ class CursWindow(QtWidgets.QMainWindow):
 
         self._currency_cb = QComboBox()
         self._currency_cb.addItems(currencies)
+
+        if "," in currency:
+            currency, *past_curr = (currency for currency in currency.split(","))
+            self._past_currencies.update(past_curr)
+            self._past_currencies.intersection_update(currencies)
+            del past_curr
+        else:
+            past_curr = ()
+
         self._currency_cb.setCurrentText(currency if currency in currencies else "EUR")
 
         top_row.addWidget(self._currency_cb)
@@ -198,7 +263,7 @@ class CursWindow(QtWidgets.QMainWindow):
         self._keep_ckb = QCheckBox("&Keep others")
         # ck_label.setBuddy(self._keep_ckb)
         top_row.addWidget(self._keep_ckb)
-        self._keep_ckb.setCheckState(False)
+        self._keep_ckb.setChecked(bool(self._past_currencies))
 
         top_row.addStretch()
 
@@ -244,6 +309,8 @@ class CursWindow(QtWidgets.QMainWindow):
             self._date_to_edit.setDate(i_to if i_to is not None else date_to)
 
     def _replot_xy(self):
+        db = self._db
+
         date_from = self._date_from_edit.date().toPyDate()
         date_to = self._date_to_edit.date().toPyDate()
         currency = self._currency_cb.currentText()
@@ -253,7 +320,7 @@ class CursWindow(QtWidgets.QMainWindow):
         if self._keep_ckb.isChecked():
             currencies.update(self._past_currencies)
 
-        rows = self._db.select_value_rows(
+        rows = db.select_value_rows(
             date=(date_from, date_to), currency=list(currencies)
         )
         colors = self._generate_colors(len(currencies))
@@ -267,58 +334,9 @@ class CursWindow(QtWidgets.QMainWindow):
 
         self._plot.set_plot_data(data)
         self._past_currencies = currencies
+
         self._set_minmax_date(db.get_date_range())
 
 
-from argparse import ArgumentParser
-from sys import argv
-
-arg_parser = ArgumentParser()
-
-arg_parser.add_argument(
-    "--db", metavar="DB", type=str, help="target database", default=None
-)
-arg_parser.add_argument(
-    "--start-date",
-    metavar="YYYY-MM-DD",
-    type=to_date,
-    help="earliest date to show",
-    default=None,
-)
-arg_parser.add_argument(
-    "--end-date",
-    metavar="YYYY-MM-DD",
-    type=to_date,
-    help="latest date to show",
-    default=None,
-)
-
-arg_parser.add_argument(
-    "--currency",
-    metavar="CUR",
-    type=str,
-    default=None,
-)
-
-args = arg_parser.parse_args(argv[1:])
-
-if args.db is None:
-    db_file = Path(__file__).parent / "bnr.db"
-else:
-    db_file = Path(args.db)
-db = CursDB(db_file, mode="ro")
-
-go_back = relativedelta(years=0, months=0, days=15)
-
-
-if args.start_date is None and args.end_date is None:
-    args.end_date = today()
-    args.start_date = today() - go_back
-
-pp = {}
-if args.currency is not None:
-    pp["currency"] = args.currency
-
-app = QtWidgets.QApplication(sys.argv)
-w = CursWindow(db=db, date_range=(args.start_date, args.end_date), **pp)
-app.exec_()
+if __name__ == "__main__":
+    main()
