@@ -20,7 +20,7 @@ dependencies:
   - pyqt # <- can't be built on Raspberry Pi
   - pyqtgraph
   - qtpy
-  - ipywidgets<8.0 # VS Code doesn't properly support 8.0
+  - ipywidgets>=8.0 # older VS Code didn't properly support 8.0
   - ipympl
   - tqdm
   #- rich
