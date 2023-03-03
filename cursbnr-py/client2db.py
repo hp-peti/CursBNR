@@ -1,33 +1,34 @@
 #!/usr/bin/env python3
 
 # %%
-from pathlib import Path
-from typing import Tuple
-from dateutil.relativedelta import relativedelta
-from dateutil.rrule import rrule, DAILY
-from tqdm import tqdm
-from suds import WebFault
 import re
-import time
-from concurrent.futures import Future, ThreadPoolExecutor
 import threading
+import time
+from argparse import ArgumentParser
+from concurrent.futures import Future, ThreadPoolExecutor
+from pathlib import Path
+from sys import argv
+from typing import Tuple
+
+from curs.client import CursClient
 
 # %%
 from curs.db import CursDB
-from curs.client import CursClient
-from curs.types import CursMap, to_date, Date, Numeric, DateCurrencyOptValueRow
-
-from pathlib import Path
-
-from argparse import ArgumentParser
-from sys import argv
+from curs.types import CursMap, Date, DateCurrencyOptValueRow, Numeric, to_date
+from dateutil.relativedelta import relativedelta
+from dateutil.rrule import DAILY, rrule
+from suds import WebFault
+from tqdm import tqdm
 
 arg_parser = ArgumentParser()
 
 arg_parser.add_argument(
     "--db", metavar="DB", type=str, help="target database", default=None
 )
-arg_parser.add_argument(
+
+start_date_args = arg_parser.add_mutually_exclusive_group()
+
+start_date_args.add_argument(
     "--start-date",
     metavar="YYYY-MM-DD",
     type=to_date,
@@ -41,7 +42,35 @@ arg_parser.add_argument(
     help="latest date to retrieve",
     default=None,
 )
+
+start_date_args.add_argument(
+    "--days",
+    metavar="DAYS",
+    type=int,
+    help="days to go back",
+    default=None,
+)
+
+start_date_args.add_argument(
+    "--months",
+    metavar="DAYS",
+    type=int,
+    help="months to go back",
+    default=None,
+)
+
+start_date_args.add_argument(
+    "--years",
+    metavar="DAYS",
+    type=int,
+    help="years to go back",
+    default=None,
+)
+del start_date_args
+
 args = arg_parser.parse_args(argv[1:])
+
+del arg_parser
 
 if args.db is None:
     db_file = Path(__file__).parent / "bnr.db"
@@ -144,7 +173,21 @@ tpx = ThreadPoolExecutor(len(currencies) + len(last_valid_date))
 
 # %%
 
-end_date=client.lastdate if args.end_date is None else min(client.lastdate, to_date(args.end_date))
+end_date = (
+    client.lastdate
+    if args.end_date is None
+    else min(client.lastdate, to_date(args.end_date))
+)
+if args.days is not None:
+    start_date = end_date - relativedelta(days=args.days)
+    pass
+elif args.months is not None:
+    start_date = end_date - relativedelta(months=args.months)
+    pass
+elif args.years is not None:
+    start_date = end_date - relativedelta(years=args.years)
+    pass
+
 
 days = list(
     map(
