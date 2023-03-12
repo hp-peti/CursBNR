@@ -11,6 +11,7 @@ from sys import argv
 
 arg_parser = ArgumentParser()
 
+arg_parser.add_argument("--replace", action="store_true", default=False)
 arg_parser.add_argument("--xml", metavar="XML", type=str, help="source xml", default="bnr.xml")
 arg_parser.add_argument("--db", metavar="DB", type=str, help="target database", default=None)
 
@@ -40,8 +41,9 @@ print(f"Read {map.get_size()} items.")
 
 print("Updating database...")
 
-db.put_rows(map.all_rows())
-
+prev_total_changes = db.total_changes
+db.insert_many_values(map.all_rows(), replace=args.replace)
+print(f"{db.total_changes - prev_total_changes} rows affected")
 print("Committing...")
 db.commit()
 print("Done!")

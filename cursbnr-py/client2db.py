@@ -198,6 +198,7 @@ days = list(
 days.reverse()
 loop = tqdm(days, leave=False)
 
+prev_total_changes = db.total_changes
 try:
     inserted = 0
 
@@ -280,6 +281,7 @@ try:
 except KeyboardInterrupt:
     pass
 finally:
+    print(f"{db.total_changes - prev_total_changes} rows affected.")
     db.commit()
 
 

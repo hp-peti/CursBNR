@@ -266,6 +266,10 @@ class CursDB:
 
         return self._exec_fetchall_rows(sql, params, type=DateCurrencyValueRow)
 
+    @property
+    def total_changes(self) -> int:
+        return self._exec_fetchone("SELECT total_changes();")[0]
+
     def select_date_currency_rows(
         self,
         *,
