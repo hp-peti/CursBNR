@@ -1,6 +1,6 @@
 # Usage:
 #     conda env create --file conda_env.yaml
-#     conda env update --file conda_env.yaml
+#     conda env update --file conda_env.yaml --prune
 #     conda env remove -n cursbnr-py
 name: cursbnr-py
 channels:
