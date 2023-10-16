@@ -71,5 +71,5 @@ def write_bnr_xml(map: CursMap, file):
                     )
                 else:
                     f.write(f"\t\t<rate date='{escape_attr(date_iso)}' />\n")
-            f.write(f"\t</currency>\n")
+            f.write("\t</currency>\n")
         f.write("</values>")

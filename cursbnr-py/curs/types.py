@@ -1,5 +1,5 @@
 import datetime as dt
-from typing import Any, Iterable, List, Tuple, Type, TypeVar
+from typing import Iterable, List, Tuple, Type, TypeVar
 
 from typing import NamedTuple
 
@@ -11,8 +11,13 @@ Numeric = int | float
 DateTime = dt.datetime
 
 DateCurrencyRow = NamedTuple("DateCurrencyRow", date=Date, currency=str)
-DateCurrencyValueRow = NamedTuple("DateCurrencyValueRow", date=Date, currency=str, value=Numeric)
-DateCurrencyOptValueRow = NamedTuple("DateCurrencyOptValueRow",date=Date, currency=str, value=Numeric|None)
+DateCurrencyValueRow = NamedTuple(
+    "DateCurrencyValueRow", date=Date, currency=str, value=Numeric
+)
+DateCurrencyOptValueRow = NamedTuple(
+    "DateCurrencyOptValueRow", date=Date, currency=str, value=Numeric | None
+)
+
 
 def to_date_opt(date: _DateT | None) -> Date | None:
     if date is None or date == "":
@@ -28,26 +33,33 @@ def to_date(date: _DateT) -> Date:
     else:
         return require_date(date)
 
+
 _T = TypeVar("_T")
+
 
 def _require_(_type: Type[_T], _val) -> _T:
     if not isinstance(_val, _type):
         raise TypeError(f"{_val}: expected {_type}, got {type(_val)}")
     return _val
 
+
 def require_date(date) -> Date:
     return _require_(Date, date)
+
 
 def require_datetime(datetime) -> DateTime:
     return _require_(DateTime, datetime)
 
+
 def require_str(s) -> str:
     return _require_(str, s)
+
 
 def to_numeric_opt(x: _NumT | None) -> Numeric | None:
     if x is None:
         return None
     return to_numeric(x)
+
 
 def to_numeric(x: _NumT) -> Numeric:
     if isinstance(x, int):
@@ -70,7 +82,6 @@ def to_datetime(date: _DateT) -> DateTime:
 def extract_dates_values(
     rows: Iterable[DateCurrencyOptValueRow], /, *, currency: str
 ) -> Tuple[List[Date], List[Numeric]]:
-
     if currency is not None:
         rows = filter(lambda dcv: dcv[1] == currency, rows)
 
@@ -82,6 +93,7 @@ def extract_dates_values(
         values.append(value)
 
     return dates, values
+
 
 class CursMap(dict):
     def __init__(self):
@@ -107,7 +119,7 @@ class CursMap(dict):
                 if value is not None:
                     yield date, currency, value
 
-    def all_rows(self) -> Iterable[Tuple[Date, str, Numeric|None]]:
+    def all_rows(self) -> Iterable[Tuple[Date, str, Numeric | None]]:
         for currency, rates in self.items():
             for date, value in rates.items():
                 yield date, currency, value
@@ -117,7 +129,6 @@ class CursMap(dict):
             for date, value in rates.items():
                 if value is None:
                     yield date, currency
-
 
     def get_size(self):
         return sum(len(submap) for submap in self.values())

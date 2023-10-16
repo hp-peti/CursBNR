@@ -2,7 +2,6 @@
 
 # %%
 from pathlib import Path
-from curs.types import CursMap
 from curs.xml import parse_bnr_xml
 from curs.db import CursDB
 
@@ -12,8 +11,12 @@ from sys import argv
 arg_parser = ArgumentParser()
 
 arg_parser.add_argument("--replace", action="store_true", default=False)
-arg_parser.add_argument("--xml", metavar="XML", type=str, help="source xml", default="bnr.xml")
-arg_parser.add_argument("--db", metavar="DB", type=str, help="target database", default=None)
+arg_parser.add_argument(
+    "--xml", metavar="XML", type=str, help="source xml", default="bnr.xml"
+)
+arg_parser.add_argument(
+    "--db", metavar="DB", type=str, help="target database", default=None
+)
 
 args = arg_parser.parse_args(argv[1:])
 xml_file = Path(args.xml)

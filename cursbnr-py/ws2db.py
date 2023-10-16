@@ -8,13 +8,12 @@ from argparse import ArgumentParser
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 from sys import argv
-from typing import Tuple
 
 from curs.client import CursClient
 
 # %%
 from curs.db import CursDB
-from curs.types import CursMap, Date, DateCurrencyOptValueRow, Numeric, to_date
+from curs.types import DateCurrencyOptValueRow, to_date
 from dateutil.relativedelta import relativedelta
 from dateutil.rrule import DAILY, rrule
 from suds import WebFault

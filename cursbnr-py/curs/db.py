@@ -1,10 +1,5 @@
-import datetime as dt
 import re
 import sqlite3
-from datetime import date as _date
-from datetime import datetime
-from datetime import time as _time
-from functools import partial
 from itertools import starmap
 from pathlib import Path
 from typing import Any, Callable, Iterable, Literal, NamedTuple, Type, TypeVar
@@ -22,7 +17,6 @@ from curs.types import (
     require_str,
     to_date,
     to_date_opt,
-    to_numeric,
     to_numeric_opt,
 )
 
@@ -242,7 +236,7 @@ class CursDB:
         sql += self._sql_order_by(orderby)
 
         row_type = (
-            DateCurrencyValueRow if value_is_null == False else DateCurrencyOptValueRow
+            DateCurrencyValueRow if value_is_null is False else DateCurrencyOptValueRow
         )
 
         return self._exec_fetchall_rows(sql, params, type=row_type)

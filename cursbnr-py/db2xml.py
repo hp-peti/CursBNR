@@ -10,8 +10,12 @@ from sys import argv
 
 arg_parser = ArgumentParser()
 
-arg_parser.add_argument("--xml", metavar="XML", type=str, help="target xml", default="bnr.xml")
-arg_parser.add_argument("--db", metavar="DB", type=str, help="source database", default=None)
+arg_parser.add_argument(
+    "--xml", metavar="XML", type=str, help="target xml", default="bnr.xml"
+)
+arg_parser.add_argument(
+    "--db", metavar="DB", type=str, help="source database", default=None
+)
 
 args = arg_parser.parse_args(argv[1:])
 xml_file = Path(args.xml)
@@ -36,4 +40,4 @@ print(f"Retrieved {map.get_size()} items.\nWriting XML file...")
 
 write_bnr_xml(map, xml_file)
 
-print(f"Done!")
+print("Done!")
