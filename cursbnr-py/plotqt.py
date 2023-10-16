@@ -1,26 +1,29 @@
 #!/usr/bin/env python3
 
 import sys
-from argparse import ArgumentParser
 from pathlib import Path
-from sys import argv
 from typing import Any, Mapping, Sequence
 
 import matplotlib
-import numpy as np
-from curs.db import CursDB
-from curs.types import Date, extract_dates_values, to_date, to_date_opt
 from dateutil.relativedelta import relativedelta
 from dateutil.utils import today
+
+matplotlib.use("Qt5Agg")
+
+import numpy as np
+from curs.db import CursDB
+from curs.types import Date, extract_dates_values, to_date_opt, to_date
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 from matplotlib.pyplot import cm
-from qtpy import QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
+from qtpy.QtCore import QDate
 from qtpy.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDateEdit,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -28,7 +31,8 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
-matplotlib.use("Qt5Agg")
+from argparse import ArgumentParser
+from sys import argv
 
 
 def main():
@@ -79,7 +83,7 @@ def main():
         pp["currency"] = args.currency
 
     app = QtWidgets.QApplication(sys.argv)
-    CursWindow(db=db, date_range=(args.start_date, args.end_date), **pp)
+    w = CursWindow(db=db, date_range=(args.start_date, args.end_date), **pp)
     app.exec_()
 
 
@@ -210,6 +214,7 @@ class CursWindow(QtWidgets.QMainWindow):
         date_range: tuple[Date, Date],
         currencies: list[str],
     ):
+
         # Create the maptlotlib FigureCanvas object,
         # which defines a single set of axes as self.axes.
         plot = MplCanvas(self, dpi=100)
@@ -309,8 +314,8 @@ class CursWindow(QtWidgets.QMainWindow):
         date_from = self._date_from_edit.date().toPyDate()
         date_to = self._date_to_edit.date().toPyDate()
         currency = self._currency_cb.currentText()
-        self._currency_cb.currentIndex()
-        self._keep_ckb.checkState()
+        n = self._currency_cb.currentIndex()
+        keep = self._keep_ckb.checkState()
         currencies = {currency}
         if self._keep_ckb.isChecked():
             currencies.update(self._past_currencies)
