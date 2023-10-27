@@ -19,6 +19,7 @@ dependencies:
   - tk
   - jupyter
   - pyqt # <- can't be built on Raspberry Pi
+  - pyqt-stubs
   - pyqtgraph
   - qtpy
   - ipywidgets>=8.0 # older VS Code didn't properly support 8.0
