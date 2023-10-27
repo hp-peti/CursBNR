@@ -8,22 +8,18 @@ import matplotlib
 from dateutil.relativedelta import relativedelta
 from dateutil.utils import today
 
-matplotlib.use("Qt5Agg")
-
 import numpy as np
 from curs.db import CursDB
 from curs.types import Date, extract_dates_values, to_date_opt, to_date
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 from matplotlib.pyplot import cm
-from qtpy import QtCore, QtGui, QtWidgets
-from qtpy.QtCore import QDate
+from qtpy import QtCore, QtGui, QtWidgets # noqa: F401
+from qtpy.QtCore import QDate # noqa: F401
 from qtpy.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDateEdit,
-    QFrame,
+    QFrame,  # noqa: F401
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -86,6 +82,9 @@ def main():
     w = CursWindow(db=db, date_range=(args.start_date, args.end_date), **pp)
     app.exec_()
 
+matplotlib.use("Qt5Agg")
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg # noqa: E402
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar # noqa: E402
 
 class MplCanvas(FigureCanvasQTAgg):
     def __init__(self, parent=None, dpi=100):
