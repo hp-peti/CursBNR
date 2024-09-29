@@ -1,287 +1,353 @@
 #!/usr/bin/env python3
 
 # %%
+from collections.abc import Iterable
 import re
 import threading
 import time
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 from sys import argv
+from typing import Final
 
-from curs.client import CursClient
+from curs.client import CursClient, Date
 
 # %%
 from curs.db import CursDB
+from curs.threadutils import thread_local_cached
 from curs.types import DateCurrencyOptValueRow, to_date
 from dateutil.relativedelta import relativedelta
 from dateutil.rrule import DAILY, rrule
 from suds import WebFault
 from tqdm import tqdm
 
-arg_parser = ArgumentParser()
 
-arg_parser.add_argument(
-    "--db", metavar="DB", type=str, help="target database", default=None
-)
+def main():
+    args = parse_args()
 
-start_date_args = arg_parser.add_mutually_exclusive_group()
+    def get_db_file_name(__file__, args):
+        if args.db is None:
+            db_file = Path(__file__).parent / "bnr.db"
+        else:
+            db_file = Path(args.db)
+            if not db_file.parent.exists() or not db_file.parent.is_dir():
+                raise AssertionError(f"invalid db file path {db_file!s}")
+        return db_file
 
-start_date_args.add_argument(
-    "--start-date",
-    metavar="YYYY-MM-DD",
-    type=to_date,
-    help="earliest date to retrieve",
-    default=None,
-)
-arg_parser.add_argument(
-    "--end-date",
-    metavar="YYYY-MM-DD",
-    type=to_date,
-    help="latest date to retrieve",
-    default=None,
-)
+    # import logging
+    # logging.basicConfig(level='DEBUG')
 
-start_date_args.add_argument(
-    "--days",
-    metavar="DAYS",
-    type=int,
-    help="days to go back",
-    default=None,
-)
+    commit_every_n = 1024
 
-start_date_args.add_argument(
-    "--months",
-    metavar="DAYS",
-    type=int,
-    help="months to go back",
-    default=None,
-)
+    autoexclude: Final[bool] = True
 
-start_date_args.add_argument(
-    "--years",
-    metavar="DAYS",
-    type=int,
-    help="years to go back",
-    default=None,
-)
-del start_date_args
+    # %%
 
-args = arg_parser.parse_args(argv[1:])
+    db = CursDB(get_db_file_name(__file__, args))
 
-del arg_parser
+    # %%
 
-if args.db is None:
-    db_file = Path(__file__).parent / "bnr.db"
-else:
-    db_file = Path(args.db)
-    if not db_file.parent.exists() or not db_file.parent.is_dir():
-        raise AssertionError(f"invalid db file path {db_file!s}")
+    thread_lock = threading.Lock()
 
+    @thread_local_cached
+    def get_client() -> CursClient:
+        return CursClient(use_local_wsdl=not True)
 
-# import logging
-# logging.basicConfig(level='DEBUG')
+    # %%
 
-start_date = "1998-01-01"
-if args.start_date is not None:
-    start_date = args.start_date
-if args.end_date is not None:
-    end_date = args.end_date
+    client = get_client()
 
-commit_every_n = 1024
-before_first_valid_date = {
-    "THB": to_date("2017-06-18"),
-    "AED": to_date("2009-03-01"),
-    "BRL": to_date("2009-03-01"),
-    "CNY": to_date("2009-03-01"),
-    "INR": to_date("2009-03-01"),
-    "KRW": to_date("2009-03-01"),
-    "MXN": to_date("2009-03-01"),
-    "NZD": to_date("2009-03-01"),
-    "RSD": to_date("2009-03-01"),
-    "UAH": to_date("2009-03-01"),
-    "ZAR": to_date("2009-03-01"),
-    "BGN": to_date("2007-12-02"),
-    "RUB": to_date("2007-11-11"),
-    "TRY": to_date("2005-01-02"),
-    "CZK": to_date("2001-11-11"),
-    "HUF": to_date("2001-11-11"),
-    "PLN": to_date("2001-11-11"),
-    "EUR": to_date("1999-01-13"),
-    "AUD": to_date("1998-01-04"),
-    "CAD": to_date("1998-01-04"),
-    "CHF": to_date("1998-01-04"),
-    "DKK": to_date("1998-01-04"),
-    "EGP": to_date("1998-01-04"),
-    "GBP": to_date("1998-01-04"),
-    "JPY": to_date("1998-01-04"),
-    "MDL": to_date("1998-01-04"),
-    "NOK": to_date("1998-01-04"),
-    "SEK": to_date("1998-01-04"),
-    "USD": to_date("1998-01-04"),
-    "XAU": to_date("1998-01-04"),
-    "XDR": to_date("1998-01-04"),
-    "HRK": to_date("2015-08-20"),
-}
-
-last_valid_date = {
-    "HRK": to_date("2022-12-31"),
-}
-
-autoexclude = True
-
-# %%
-
-db = CursDB(db_file)
-
-# %%
-
-thread_local = threading.local()
-thread_lock = threading.Lock()
-
-
-def get_client() -> CursClient:
-    global thread_local
-    if not hasattr(thread_local, "client"):
-        thread_local.client = CursClient(use_local_wsdl=not True)
-    return thread_local.client
-
-
-# %%
-
-client = get_client()
-
-# %%
-if True:
-    currencies = list(map(lambda x: x[0], client.get_all()))
-else:
-    currencies = list(before_first_valid_date.keys())
-
-all_currencies = sorted(list(set(currencies + list(last_valid_date.keys()))))
-print(" ".join(all_currencies))
-
-xcache = set()
-
-for date, currency in db.select_date_currency_rows(
-    currency=all_currencies, value_is_null=None
-):
-    xcache.add((date, currency))
-
-tpx = ThreadPoolExecutor(len(currencies) + len(last_valid_date))
-
-
-# %%
-
-end_date = (
-    client.lastdate
-    if args.end_date is None
-    else min(client.lastdate, to_date(args.end_date))
-)
-if args.days is not None:
-    start_date = end_date - relativedelta(days=args.days)
-    pass
-elif args.months is not None:
-    start_date = end_date - relativedelta(months=args.months)
-    pass
-elif args.years is not None:
-    start_date = end_date - relativedelta(years=args.years)
-    pass
-
-
-days = list(
-    map(
-        lambda d: d.date(),
-        rrule(DAILY, to_date(start_date), until=end_date),
+    _before_first_valid_date: dict[str, Date] = invert_date_to_curr_list(
+        before_first_valid_date_
     )
-)
-days.reverse()
-loop = tqdm(days, leave=False)
 
-prev_total_changes = db.total_changes
-try:
-    inserted = 0
+    _last_valid_date: dict[str, Date] = invert_date_to_curr_list(last_valid_date_)
 
-    def after_insert(count: int):
-        global inserted, commit_every_n, loop, db
-        inserted += count
-        if inserted >= commit_every_n:
-            loop.set_postfix_str("COMMITING...  ")
-            db.commit()
-            inserted = 0
+    # %%
+    currencies, all_currencies = get_currencies(
+        _before_first_valid_date, _last_valid_date, client
+    )
+    print(" ".join(all_currencies))
 
-    def fetch(date, currency) -> DateCurrencyOptValueRow | None:
-        try:
-            loop.set_postfix_str(f"{date} {currency}")
-            r_date, r_currency, r_value = get_client().get_value(date, currency)
-            if r_date != date:
-                return DateCurrencyOptValueRow(date, currency, None)
-            else:
-                return DateCurrencyOptValueRow(r_date, r_currency, r_value)
-        except WebFault as wf:
-            with thread_lock:
-                tqdm.write(f"{wf!s} @{date} {currency})")
-                if autoexclude:
-                    if re.fullmatch(
-                        r".*Object reference not set to an instance of an object\..*",
-                        str(wf),
-                    ):
-                        tqdm.write(f"Skipping {currency} before {date}")
-                        exclude_currency.append(currency)
+    xcache = set()
 
-    exclude_currency = []
-    for date in loop:
-        futures: list[Future] = []
+    for date, currency in db.select_date_currency_rows(
+        currency=all_currencies, value_is_null=None
+    ):
+        xcache.add((date, currency))
 
-        try:
-            for currency, a_date in list(last_valid_date.items()):
-                if date <= last_valid_date[currency]:
-                    if currency not in currencies:
-                        currencies.append(currency)
-                    del last_valid_date[currency]
+    tpx = ThreadPoolExecutor(len(currencies) + len(_last_valid_date))
 
-            for currency in currencies:
-                if (date, currency) in xcache:
-                    # xcache.remove((date, currency))
-                    continue  # inner loop
+    # %%
 
-                if currency in before_first_valid_date:
-                    if date <= before_first_valid_date[currency]:
-                        exclude_currency.append(currency)
-                        del before_first_valid_date[currency]
+    start_date, end_date = get_start_date_end_date(args, client)
 
+    days = list(
+        map(
+            lambda d: d.date(),
+            rrule(DAILY, start_date, until=end_date),
+        )
+    )
+    days.reverse()
+    loop = tqdm(days, leave=False)
+
+    prev_total_changes = db.total_changes
+    try:
+        inserted = 0
+
+        def after_insert(count: int):
+            nonlocal inserted, commit_every_n, loop, db
+            inserted += count
+            if inserted >= commit_every_n:
+                loop.set_postfix_str("COMMITING...  ")
+                db.commit()
+                inserted = 0
+
+        def fetch(date, currency) -> DateCurrencyOptValueRow | None:
+            try:
+                loop.set_postfix_str(f"{date} {currency}")
+                r_date, r_currency, r_value = get_client().get_value(date, currency)
+                if r_date != date:
+                    return DateCurrencyOptValueRow(date, currency, None)
+                else:
+                    return DateCurrencyOptValueRow(r_date, r_currency, r_value)
+            except WebFault as wf:
+                with thread_lock:
+                    tqdm.write(f"{wf!s} @{date} {currency})")
+                    if autoexclude:
+                        if re.fullmatch(
+                            r".*Object reference not set to an instance of an object\..*",
+                            str(wf),
+                        ):
+                            tqdm.write(f"Skipping {currency} before {date}")
+                            exclude_currency.append(currency)
+
+        exclude_currency = []
+        for date in loop:
+            futures: list[Future] = []
+
+            try:
+                for currency, a_date in list(_last_valid_date.items()):
+                    if date <= _last_valid_date[currency]:
+                        if currency not in currencies:
+                            currencies.append(currency)
+                        del _last_valid_date[currency]
+
+                for currency in currencies:
+                    if (date, currency) in xcache:
+                        # xcache.remove((date, currency))
                         continue  # inner loop
 
-                if not db.select_rows(date=date, currency=currency, value_is_null=None):
-                    futures.append(tpx.submit(fetch, date, currency))
-                    time.sleep(0.001)
+                    if currency in _before_first_valid_date:
+                        if date <= _before_first_valid_date[currency]:
+                            exclude_currency.append(currency)
+                            del _before_first_valid_date[currency]
 
-        finally:
+                            continue  # inner loop
 
-            def get_result(f: Future):
-                return f.result()
+                    if not db.select_rows(
+                        date=date, currency=currency, value_is_null=None
+                    ):
+                        futures.append(tpx.submit(fetch, date, currency))
+                        time.sleep(0.001)
 
-            def is_not_None(r) -> bool:
-                return r is not None
+            finally:
 
-            results = list(filter(is_not_None, map(get_result, futures)))
-            futures.clear()
-            db.put_rows(results)
-            after_insert(len(results))
+                def get_result(f: Future):
+                    return f.result()
 
-        if exclude_currency:
-            for currency in exclude_currency:
-                currencies.remove(currency)
-            exclude_currency.clear()
+                def is_not_None(r) -> bool:
+                    return r is not None
 
-            if not currencies:
-                break  # outer loop
+                results = list(filter(is_not_None, map(get_result, futures)))
+                futures.clear()
+                db.put_rows(results)
+                after_insert(len(results))
+
+            if exclude_currency:
+                for currency in exclude_currency:
+                    currencies.remove(currency)
+                exclude_currency.clear()
+
+                if not currencies:
+                    break  # outer loop
+
+    except KeyboardInterrupt:
+        pass
+
+    finally:
+        print(f"{db.total_changes - prev_total_changes} rows affected.")
+        db.commit()
 
 
-except KeyboardInterrupt:
-    pass
-finally:
-    print(f"{db.total_changes - prev_total_changes} rows affected.")
-    db.commit()
+def invert_date_to_curr_list(
+    dates_to_currencies: Iterable[tuple[str, str | tuple[str, ...] | list[str]]],
+) -> dict[str, Date]:
+    return {
+        curr_str: to_date(date)
+        for date, curr_str_or_sequence in dates_to_currencies
+        for curr_str in (
+            curr_str_or_sequence
+            if isinstance(curr_str_or_sequence, list | tuple)
+            else (curr_str_or_sequence,)
+        )
+    }
 
 
-# %%
+def get_currencies(
+    before_first_valid_date: dict[str, Date],
+    last_valid_date: dict[str, Date],
+    client: CursClient,
+):
+    if True:
+        currencies = list(map(lambda x: x[0], client.get_all()))
+    else:
+        currencies = list(before_first_valid_date.keys())
+
+    all_currencies = sorted(list(set(currencies + list(last_valid_date.keys()))))
+    return currencies, all_currencies
+
+
+def parse_args():
+    arg_parser = ArgumentParser()
+
+    arg_parser.add_argument(
+        "--db", metavar="DB", type=str, help="target database", default=None
+    )
+
+    start_date_args = arg_parser.add_mutually_exclusive_group()
+
+    start_date_args.add_argument(
+        "--start-date",
+        metavar="YYYY-MM-DD",
+        type=to_date,
+        help="earliest date to retrieve",
+        default=None,
+    )
+    arg_parser.add_argument(
+        "--end-date",
+        metavar="YYYY-MM-DD",
+        type=to_date,
+        help="latest date to retrieve",
+        default=None,
+    )
+
+    start_date_args.add_argument(
+        "--days",
+        metavar="DAYS",
+        type=int,
+        help="days to go back",
+        default=None,
+    )
+
+    start_date_args.add_argument(
+        "--months",
+        metavar="DAYS",
+        type=int,
+        help="months to go back",
+        default=None,
+    )
+
+    start_date_args.add_argument(
+        "--years",
+        metavar="DAYS",
+        type=int,
+        help="years to go back",
+        default=None,
+    )
+    del start_date_args
+
+    args = arg_parser.parse_args(argv[1:])
+    return args
+
+
+def get_start_date_end_date(args: Namespace, client: CursClient) -> tuple[Date, Date]:
+    start_date = to_date("1998-01-01")
+    if args.start_date is not None:
+        start_date = to_date(args.start_date)
+    end_date = (
+        client.lastdate
+        if args.end_date is None
+        else min(client.lastdate, to_date(args.end_date))
+    )
+
+    if args.days is not None:
+        start_date = to_date(end_date - relativedelta(days=args.days - 1))
+    if args.months is not None:
+        start_date = to_date(end_date - relativedelta(months=args.months, days=-1))
+    if args.years is not None:
+        start_date = to_date(end_date - relativedelta(years=args.years, days=-1))
+
+    return start_date, end_date
+
+
+before_first_valid_date_: list[tuple[str, str | tuple[str, ...] | list[str]]] = [
+    ("2017-06-18", "THB"),
+    (
+        "2009-03-01",
+        (
+            "AED",
+            "BRL",
+            "CNY",
+            "INR",
+            "KRW",
+            "MXN",
+            "NZD",
+            "RSD",
+            "UAH",
+            "ZAR",
+        ),
+    ),
+    ("2007-12-02", "BGN"),
+    ("2007-11-11", "RUB"),
+    ("2005-01-02", "TRY"),
+    (
+        "2001-11-11",
+        (
+            "CZK",
+            "HUF",
+            "PLN",
+        ),
+    ),
+    ("1999-01-13", "EUR"),
+    (
+        "1998-01-04",
+        (
+            "AUD",
+            "CAD",
+            "CHF",
+            "DKK",
+            "EGP",
+            "GBP",
+            "JPY",
+            "MDL",
+            "NOK",
+            "SEK",
+            "USD",
+            "XAU",
+            "XDR",
+        ),
+    ),
+    ("2015-08-20", "HRK"),
+    (
+        "2024-09-22",
+        (
+            "HKD",
+            "IDR",
+            "ILS",
+            "ISK",
+            "MYR",
+            "PHP",
+            "SGD",
+        ),
+    ),
+]
+
+last_valid_date_: list[tuple[str, str | tuple[str, ...] | list[str]]] = [
+    ("2022-12-31", "HRK"),
+]
+
+
+if __name__ == "__main__":
+    main()
