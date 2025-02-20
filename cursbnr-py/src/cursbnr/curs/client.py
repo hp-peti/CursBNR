@@ -1,9 +1,9 @@
 import datetime as dt
 from pathlib import Path
-from typing import List, Tuple
 
-from curs.types import Date, Numeric, _DateT, to_date, to_datetime, to_numeric
 from suds.client import Client as _suds_Client
+
+from .types import Date, Numeric, _DateT, to_date, to_datetime, to_numeric
 
 
 class CursClient:
@@ -17,7 +17,7 @@ class CursClient:
     def lastdate(self) -> dt.date:
         return self._client.service.lastdateinserted().date()
 
-    def get_all(self, date: _DateT | None = None) -> List[Tuple[str, Numeric]]:
+    def get_all(self, date: _DateT | None = None) -> list[tuple[str, Numeric]]:
         if date is None:
             date = self.lastdate
         date = to_datetime(date)
@@ -36,6 +36,6 @@ class CursClient:
     def value(self, date: _DateT, currency: str) -> Numeric | None:
         return self._client.service.getvalue(date, currency)
 
-    def get_value(self, date: _DateT, currency: str) -> Tuple[Date, str, Numeric]:
+    def get_value(self, date: _DateT, currency: str) -> tuple[Date, str, Numeric]:
         result = self._client.service.getvalueadv(to_datetime(date), currency)
         return to_date(result.date), result.moneda, to_numeric(result.value)

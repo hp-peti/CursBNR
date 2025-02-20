@@ -6,7 +6,7 @@ from typing import Any, Callable, Iterable, Literal, NamedTuple, Type, TypeVar
 
 from textwrap import dedent
 
-from curs.types import (
+from .types import (
     Date,
     Numeric,
     DateCurrencyRow,
@@ -223,7 +223,7 @@ class CursDB:
         date: _DateT | tuple[_DateT, _DateT] | None = None,
         currency: str | list[str] | None = None,
         orderby: str | None = None,
-        value_is_null: bool,  # = None
+        value_is_null: bool|None,  # = None
     ) -> list[DateCurrencyOptValueRow] | list[DateCurrencyValueRow]:
 
         sql, params = self._sql_where(

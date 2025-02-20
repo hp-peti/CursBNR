@@ -1,0 +1,45 @@
+[project]
+name = "cursbnr-py"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "ipympl>=0.9.6",
+    "ipython>=8.32.0",
+    "ipywidgets>=8.1.5",
+    "jupyter>=1.1.1",
+    "matplotlib>=3.10.0",
+    "numpy>=2.2.3",
+    "numpy-financial>=1.0.0",
+    "pandas>=2.2.3",
+    "pyqtgraph>=0.13.7",
+    "pyside6>=6.8.2.1",
+    "pyside6-stubs>=6.4.2.0",
+    "python-dateutil>=2.9.0.post0",
+    "qtpy>=2.4.3",
+    "suds>=1.2.0",
+    "termtables>=0.2.4",
+    "tk>=0.1.0",
+    "tqdm>=4.67.1",
+    "xarray>=2025.1.2",
+]
+
+[project.scripts]
+cursbnr-db2xml="cursbnr.db2xml:main"
+cursbnr-ws2db="cursbnr.ws2db:main"
+cursbnr-xml2db="cursbnr.xml2db:main"
+
+[project.gui-scripts]
+cursbnr-plotqt="cursbnr.plotqt:main"
+
+[build-system]
+requires = [
+    "setuptools>=61",
+    "setuptools-scm>=8.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"cursbnr_py" = ["curs/*.wsdl"]

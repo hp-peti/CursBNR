@@ -1,9 +1,10 @@
-from xml.sax.handler import ContentHandler
-from xml.sax import parse as xml_parse
-from xml.sax.saxutils import escape
-from curs.types import CursMap
-
 import datetime as dt
+from typing import TYPE_CHECKING
+from xml.sax import parse as xml_parse
+from xml.sax.handler import ContentHandler
+from xml.sax.saxutils import escape
+
+from .types import CursMap
 
 
 def escape_attr(data):
@@ -22,10 +23,10 @@ class _BnrXmlHandler(ContentHandler):
         super().__init__()
         assert isinstance(map, CursMap)
         self._map = map
-        self._stack = []
+        self._stack: list[str] = []
         self._currency = None
 
-    def startElement(self, name, attrs):
+    def startElement(self, name: str, attrs):
         stack = self._stack
         stack.append(name)
 
@@ -33,6 +34,8 @@ class _BnrXmlHandler(ContentHandler):
             self._currency = attrs["name"]
 
         elif stack == ["values", "currency", "rate"]:
+            if TYPE_CHECKING:
+                assert self._currency is not None
             self._map.put_value(attrs["date"], self._currency, attrs.get("value", None))
 
     def endElement(self, name):
@@ -61,13 +64,13 @@ def write_bnr_xml(map: CursMap, file):
                 assert isinstance(date, dt.date)
                 date_iso = date.isoformat()
                 if value is not None:
-                    value = (
-                        "{:.6g}".format(value)
+                    value_str: str = (
+                        f"{value:.6g}"
                         if isinstance(value, float)
-                        else str(int(value))
+                        else f"{int(value)!s}"
                     )
                     f.write(
-                        f"\t\t<rate date='{escape_attr(date_iso)}' value='{escape_attr(value)}' />\n"  # noqa: E501
+                        f"\t\t<rate date='{escape_attr(date_iso)}' value='{escape_attr(value_str)}' />\n"  # noqa: E501
                     )
                 else:
                     f.write(f"\t\t<rate date='{escape_attr(date_iso)}' />\n")

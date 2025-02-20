@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 
 import sys
+from argparse import ArgumentParser
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from sys import argv
+from typing import TYPE_CHECKING, Any
 
 import matplotlib
+import numpy as np
 from dateutil.relativedelta import relativedelta
 from dateutil.utils import today
-
-import numpy as np
-from curs.db import CursDB
-from curs.types import Date, extract_dates_values, to_date_opt, to_date
 from matplotlib.figure import Figure
 from matplotlib.pyplot import cm
 from qtpy import QtCore, QtGui, QtWidgets  # noqa: F401
@@ -27,8 +27,17 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
-from argparse import ArgumentParser
-from sys import argv
+if TYPE_CHECKING or __name__ != "__main__":
+    from .curs.db import CursDB
+    from .curs.types import Date, extract_dates_values, to_date, to_date_opt
+else:
+    from curs.db import CursDB
+    from curs.types import (
+        Date,
+        extract_dates_values,
+        to_date,
+        to_date_opt,
+    )
 
 
 def main():
@@ -62,7 +71,7 @@ def main():
     args = arg_parser.parse_args(argv[1:])
 
     if args.db is None:
-        db_file = Path(__file__).parent / "bnr.db"
+        db_file = Path.cwd() / "bnr.db"
     else:
         db_file = Path(args.db)
 
@@ -84,8 +93,10 @@ def main():
 
 
 matplotlib.use("Qt5Agg")
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg  # noqa: E402
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT  # noqa: E402
+from matplotlib.backends.backend_qt5agg import (
+    FigureCanvasQTAgg,  # noqa: E402
+    NavigationToolbar2QT,  # noqa: E402
+)
 
 
 class MplCanvas(FigureCanvasQTAgg):

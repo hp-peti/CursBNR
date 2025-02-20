@@ -1,34 +1,41 @@
 #!/usr/bin/env python3
 
 # %%
-from collections.abc import Iterable
 import re
 import threading
 import time
 from argparse import ArgumentParser, Namespace
+from collections.abc import Iterable
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 from sys import argv
-from typing import Final
+from typing import Any, Final
 
-from curs.client import CursClient, Date
-
-# %%
-from curs.db import CursDB
-from curs.threadutils import thread_local_cached
-from curs.types import DateCurrencyOptValueRow, to_date
 from dateutil.relativedelta import relativedelta
 from dateutil.rrule import DAILY, rrule
 from suds import WebFault
 from tqdm import tqdm
 
+if __name__ == "__main__":
+    from curs.client import CursClient, Date
+    from curs.db import CursDB
+    from curs.threadutils import thread_local_cached
+    from curs.types import DateCurrencyOptValueRow, to_date
+else:
+    from .curs.client import CursClient, Date  # type: ignore
+    from .curs.db import CursDB  # type: ignore
+    from .curs.threadutils import thread_local_cached  # type: ignore
+    from .curs.types import DateCurrencyOptValueRow, to_date  # type: ignore
 
-def main():
+# %%
+
+
+def main() -> None:
     args = parse_args()
 
-    def get_db_file_name(__file__, args):
+    def get_db_file_name(args):
         if args.db is None:
-            db_file = Path(__file__).parent / "bnr.db"
+            db_file = Path.cwd() / "bnr.db"
         else:
             db_file = Path(args.db)
             if not db_file.parent.exists() or not db_file.parent.is_dir():
@@ -44,7 +51,7 @@ def main():
 
     # %%
 
-    db = CursDB(get_db_file_name(__file__, args))
+    db = CursDB(get_db_file_name(args))
 
     # %%
 
@@ -104,7 +111,7 @@ def main():
                 db.commit()
                 inserted = 0
 
-        def fetch(date, currency) -> DateCurrencyOptValueRow | None:
+        def fetch(date: Any, currency: Any) -> DateCurrencyOptValueRow | None:
             try:
                 loop.set_postfix_str(f"{date} {currency}")
                 r_date, r_currency, r_value = get_client().get_value(date, currency)
@@ -122,6 +129,7 @@ def main():
                         ):
                             tqdm.write(f"Skipping {currency} before {date}")
                             exclude_currency.append(currency)
+                return None
 
         exclude_currency = []
         for date in loop:
